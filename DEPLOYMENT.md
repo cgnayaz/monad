@@ -10,13 +10,20 @@
 | MON/USD feed | `0x31491744e2dbf6df7fcf4ac0820d18a609b49076d45066d3568424e62f686cd1` | verified via Hermes |
 | Hermes | `https://pyth.dourolabs.app/hermes` + `PYTH_API_KEY` (Bearer) | key required since 2026-08-26; old host returns 401 for price updates |
 | Pyth testnet contract accepts post-upgrade update format | — | to verify with a fork test before contract deploy |
-| Explorer | `https://testnet.monadexplorer.com` | to verify |
-| Source verification | Sourcify / explorer API | to verify |
+| Explorer | `https://testnet.monadexplorer.com` | used for links |
+| Source verification | Sourcify, `https://sourcify-api-monad.blockvision.org` | verified: all four contracts exact match |
 | Faucet | `https://faucet.monad.xyz` | to verify limits |
 | `eth_getLogs` range limit | — | to verify; UI queries exact blocks only |
 
-Monad specifics to respect: gas is charged on the **gas limit**, not gas used — set
-explicit, tight gas limits from `estimateGas` × 1.2 instead of large defaults.
+Monad specifics to respect:
+- Gas is charged on the **gas limit**, not gas used — keep limits tight (RPC estimate + ~10 %).
+- Cold storage writes cost more than in a local EVM simulation. Forge's simulated estimate
+  was too low for `depositActive` (out of gas); scripts that write storage should use
+  `--skip-simulation` so the RPC estimates gas.
+- Several back-to-back value transfers from one account can fail at execution (Monad's
+  asynchronous execution / reserve-balance check) although they simulate fine. `Setup.s.sol`
+  is idempotent, so re-running it sends only what is missing; spacing transfers a few
+  seconds apart avoids the failure.
 
 ## 2. Keys and funding (testnet only)
 

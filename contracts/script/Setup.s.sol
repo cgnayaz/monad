@@ -5,11 +5,13 @@ import {Script, console2} from "forge-std/Script.sol";
 import {DecisionRegistry} from "../src/DecisionRegistry.sol";
 import {ExecutionVault} from "../src/ExecutionVault.sol";
 
-/// @notice Funds a fresh deployment from the deployer key: the vault treasury (RESERVE and
-///         ACTIVE), the reward pool, a bond for each agent, and gas for the proposer, keeper
-///         and agent operators. Reads addresses from web/lib/chain/deployments.<chainId>.json.
+/// @notice Tops up a deployment from the deployer key to target levels: the vault treasury
+///         (RESERVE and ACTIVE), the reward pool, each agent's free bond, and gas for the
+///         proposer, keeper and agent operators. Idempotent: only the shortfall is sent, so it
+///         can be re-run safely. Reads addresses from web/lib/chain/deployments.<chainId>.json.
 ///
-///   forge script script/Setup.s.sol --rpc-url monad_testnet --broadcast
+/// Monad prices cold storage higher than the local simulation, so let the RPC estimate gas:
+///   forge script script/Setup.s.sol --rpc-url monad_testnet --broadcast --slow --skip-simulation
 contract Setup is Script {
     uint256 internal constant VAULT_RESERVE = 1 ether;
     uint256 internal constant VAULT_ACTIVE = 1 ether;
@@ -26,21 +28,29 @@ contract Setup is Script {
         ExecutionVault vault = ExecutionVault(payable(vm.parseJsonAddress(json, ".contracts.ExecutionVault")));
         string[5] memory keys = ["RISK", "YIELD", "SECURITY", "MARKET", "HISTORY"];
 
+        (uint256 active, uint256 reserve) = vault.balances();
+        uint256 pool = registry.rewardPool();
+
         vm.startBroadcast(pk);
-        vault.deposit{value: VAULT_RESERVE}();
-        vault.depositActive{value: VAULT_ACTIVE}();
-        registry.fundRewardPool{value: REWARD_POOL}();
+        if (reserve < VAULT_RESERVE) vault.deposit{value: VAULT_RESERVE - reserve}();
+        if (active < VAULT_ACTIVE) vault.depositActive{value: VAULT_ACTIVE - active}();
+        if (pool < REWARD_POOL) registry.fundRewardPool{value: REWARD_POOL - pool}();
         for (uint16 i = 0; i < 5; i++) {
-            registry.depositBond{value: AGENT_BOND}(i);
-            address operator = vm.envAddress(string.concat("AGENT_", keys[i], "_ADDRESS"));
-            payable(operator).transfer(AGENT_GAS);
+            uint256 bond = registry.getAgent(i).bond;
+            if (bond < AGENT_BOND) registry.depositBond{value: AGENT_BOND - bond}(i);
+            _topUp(vm.envAddress(string.concat("AGENT_", keys[i], "_ADDRESS")), AGENT_GAS);
         }
-        payable(vm.envAddress("PROPOSER_ADDRESS")).transfer(PROPOSER_GAS);
-        payable(vm.envAddress("KEEPER_ADDRESS")).transfer(KEEPER_GAS);
+        _topUp(vm.envAddress("PROPOSER_ADDRESS"), PROPOSER_GAS);
+        _topUp(vm.envAddress("KEEPER_ADDRESS"), KEEPER_GAS);
         vm.stopBroadcast();
 
-        (uint256 active, uint256 reserve) = vault.balances();
-        console2.log("vault active / reserve", active, reserve);
+        (active, reserve) = vault.balances();
+        console2.log("vault active", active);
+        console2.log("vault reserve", reserve);
         console2.log("reward pool", registry.rewardPool());
+    }
+
+    function _topUp(address to, uint256 target) private {
+        if (to.balance < target) payable(to).transfer(target - to.balance);
     }
 }

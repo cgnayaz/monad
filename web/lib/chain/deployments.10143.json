@@ -1,10 +1,10 @@
 {
   "chainId": 10143,
-  "deployBlock": null,
   "contracts": {
-    "DecisionRegistry": null,
-    "DecisionEngine": null,
-    "ExecutionVault": null,
-    "OutcomeRegistry": null
-  }
+    "DecisionEngine": "0x56c3CD72df8667Db4486b5268DE5d4CDCf17c284",
+    "DecisionRegistry": "0x5Bb0b4Ae439e34c90a877237DB584FCEEBA37894",
+    "ExecutionVault": "0xd1E4768905AaA8B473617b0eF625C0acbfD59C1a",
+    "OutcomeRegistry": "0xfd9bbcaAd1334dD4363aaa973d7Fe2075dc53B0D"
+  },
+  "deployBlock": 65832355
 }
