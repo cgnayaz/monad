@@ -1,6 +1,6 @@
 import type { AgentSpec } from "@/lib/jev/agents";
-import type { JevQuestion } from "@/lib/jev/questions";
-import type { JevState } from "@/lib/jev/state";
+import type { Question } from "@/lib/model/question";
+import type { StateRecord } from "@/lib/model/state";
 
 /**
  * AI provider abstraction. A provider turns (agent, state, questions) into raw
@@ -10,8 +10,8 @@ import type { JevState } from "@/lib/jev/state";
 
 export interface EvaluationRequest {
   agent: AgentSpec;
-  state: JevState;
-  questions: JevQuestion[]; // only the questions assigned to this agent
+  state: StateRecord;
+  questions: Question[]; // only the questions assigned to this agent
   horizonSec: number;
   bandBps: number;
 }

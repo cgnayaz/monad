@@ -28,7 +28,7 @@ export function userPrompt(req: EvaluationRequest): string {
   const questions = req.questions
     .map((q) => {
       const rubric = q.rubric.map((r) => `    - ${r.factor} (weight ${r.weight}): ${r.description}`).join("\n");
-      return `Question ${q.id} [${q.key}]: ${q.text}\n  Allowed forks: ${q.allowedForks.join(", ")}\n  Rubric factors:\n${rubric}`;
+      return `Question index ${q.index} [${q.category}] (id ${q.questionId}): ${q.text}\n  Allowed forks: ${q.allowedForks.join(", ")}\n  Rubric factors:\n${rubric}`;
     })
     .join("\n\n");
 
@@ -39,7 +39,7 @@ export function userPrompt(req: EvaluationRequest): string {
     `Verification rule: over a horizon of ${req.horizonSec} s after execution, the MON/USD move is measured from signed Pyth prices. ` +
       `A fall of more than ${req.bandBps} bps makes DERISK correct, a rise of more than ${req.bandBps} bps makes DEPLOY correct, otherwise NO_ACTION is correct. ESCALATE is neutral.`,
     "",
-    "Questions to answer (answer every one, no others):",
+    "Questions to answer (answer every one, no others; refer to each by its questionIndex):",
     questions,
     "",
     "State (canonical JSON):",

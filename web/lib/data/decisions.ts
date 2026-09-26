@@ -1,24 +1,41 @@
 import "server-only";
+import { decodeFunctionData, type Abi } from "viem";
 import { decisionEngineAbi, decisionRegistryAbi, executionVaultAbi, outcomeRegistryAbi } from "@/lib/chain/abis";
 import { publicClient } from "@/lib/chain/client";
-import { deployment, type Deployment } from "@/lib/chain/deployments";
+import { CONTRACT_NAMES, deployment, type ContractName, type Deployment } from "@/lib/chain/deployments";
+import { MONAD_TESTNET, PYTH } from "@/lib/config/public";
+import { AGENTS } from "@/lib/jev/agents";
+import { ACTION_SPACE } from "@/lib/model/action";
+import type { Action } from "@/lib/model/action";
+import type { Aggregation } from "@/lib/model/aggregation";
+import type { Settlement, SettlementStatus } from "@/lib/model/accountability";
+import type { SubmissionRecord } from "@/lib/model/decision";
+import type { Outcome } from "@/lib/model/outcome";
+import { toProbability, toScore } from "@/lib/model/primitives";
+import type { AgentRef, DecisionProvenance, DecisionRecord } from "@/lib/model/provenance";
+import type { LifecycleTransition, TxRef } from "@/lib/model/transaction";
 import {
+  FORKS,
   forkFromIndex,
   ok,
   SETTLEMENT_RESULTS,
   statusFromIndex,
   STATUSES,
   unavailable,
+  type Address,
   type Availability,
   type Fork,
   type Hex,
-  type SettlementResult,
   type Status,
 } from "@/lib/types/protocol";
 
 /**
- * Read models for decisions. Every value here comes from contract storage or logs.
+ * Chain read models. Every value comes from contract storage, logs or transactions;
+ * off-chain payloads are attached elsewhere after their hashes are checked.
  */
+
+/** OutcomeRegistry.RESOLUTION_TOLERANCE (CONTRACT_SPEC.md §8). */
+const RESOLUTION_TOLERANCE_SEC = 60;
 
 export interface DecisionSummary {
   id: bigint;
@@ -26,59 +43,6 @@ export interface DecisionSummary {
   stateHash: Hex;
   createdAt: number;
   participants: number;
-}
-
-export interface SubmissionView {
-  agentId: number;
-  submitted: boolean;
-  choice: Fork | null;
-  score: number | null;
-  probability: number | null;
-  reasonHash: Hex | null;
-  answersRoot: Hex | null;
-  submittedAt: number | null;
-}
-
-export interface DecisionDetail extends DecisionSummary {
-  questionsHash: Hex;
-  proposer: Hex;
-  openedAt: number;
-  deadline: number;
-  roundReward: bigint;
-  config: {
-    submissionWindow: number;
-    horizon: number;
-    bandBps: number;
-    thresholdBps: number;
-    minActionScore: number;
-    quorum: number;
-    allowedForks: number;
-    lockPerAgent: bigint;
-  };
-  transitions: { status: Status; block: bigint; txHash: Hex | null }[];
-  submissions: SubmissionView[];
-  aggregation: {
-    support: bigint[];
-    totalSupport: bigint;
-    leading: Fork;
-    thresholdPassed: boolean;
-    approved: Fork;
-    guardianRequired: boolean;
-    guardianDeadline: number;
-    submissions: number;
-  } | null;
-  execution: {
-    action: Fork;
-    amountMoved: bigint;
-    activeAfter: bigint;
-    reserveAfter: bigint;
-    startPrice: bigint;
-    expo: number;
-    startPublishTime: number;
-    executedAt: number;
-  } | null;
-  outcome: { endPrice: bigint; endPublishTime: number; moveBps: bigint; correctFork: Fork; resolvedAt: number } | null;
-  settlement: { agentId: number; result: SettlementResult; lockReleased: bigint; penalty: bigint; reward: bigint }[] | null;
 }
 
 type Deployed = Extract<Deployment, { deployed: true }>;
@@ -91,6 +55,11 @@ function requireDeployment(): Availability<Deployed> {
 function rpcReason(err: unknown): string {
   return err instanceof Error ? `RPC read failed: ${err.message.split("\n")[0]}` : "RPC read failed";
 }
+
+const executable = (f: Fork): Exclude<Fork, "ESCALATE"> => {
+  if (f === "ESCALATE") throw new Error("ESCALATE is not an executable fork");
+  return f;
+};
 
 export async function listDecisions(limit = 50): Promise<Availability<DecisionSummary[]>> {
   const d = requireDeployment();
@@ -117,81 +86,27 @@ export async function listDecisions(limit = 50): Promise<Availability<DecisionSu
   }
 }
 
-export async function getDecision(id: bigint): Promise<Availability<DecisionDetail | null>> {
-  const d = requireDeployment();
-  if (d.status !== "ok") return d;
-  const { DecisionRegistry, DecisionEngine, ExecutionVault, OutcomeRegistry } = d.value.addresses;
+/** Reconstruct the full provenance of one decision from chain. */
+export async function getDecisionProvenance(id: bigint): Promise<Availability<DecisionProvenance | null>> {
+  const dep = requireDeployment();
+  if (dep.status !== "ok") return dep;
+  const addr = dep.value.addresses;
+  const decisionId = id.toString();
+
   try {
-    const count = await publicClient.readContract({ address: DecisionRegistry, abi: decisionRegistryAbi, functionName: "decisionCount" });
+    const count = await publicClient.readContract({ address: addr.DecisionRegistry, abi: decisionRegistryAbi, functionName: "decisionCount" });
     if (id < 1n || id > count) return ok(null);
-    const r = await publicClient.readContract({ address: DecisionRegistry, abi: decisionRegistryAbi, functionName: "getDecision", args: [id] });
+    const r = await publicClient.readContract({ address: addr.DecisionRegistry, abi: decisionRegistryAbi, functionName: "getDecision", args: [id] });
     const status = statusFromIndex(r.status);
-    const reached = (s: Status) => STATUSES.indexOf(status) >= STATUSES.indexOf(s) && status !== "CANCELLED";
+    const reached = (s: Status) => status !== "CANCELLED" && STATUSES.indexOf(status) >= STATUSES.indexOf(s);
+    const participants = [...r.participants];
 
-    const submissions = await Promise.all(
-      r.participants.map(async (agentId): Promise<SubmissionView> => {
-        const s = await publicClient.readContract({
-          address: DecisionRegistry,
-          abi: decisionRegistryAbi,
-          functionName: "getSubmission",
-          args: [id, agentId],
-        });
-        const submitted = s.submittedAt > 0n;
-        return {
-          agentId,
-          submitted,
-          choice: submitted ? forkFromIndex(s.choice) : null,
-          score: submitted ? s.score : null,
-          probability: submitted ? s.probability : null,
-          reasonHash: submitted ? s.reasonHash : null,
-          answersRoot: submitted ? s.answersRoot : null,
-          submittedAt: submitted ? Number(s.submittedAt) : null,
-        };
-      }),
-    );
-
-    const agg = reached("AGGREGATED")
-      ? await publicClient.readContract({ address: DecisionEngine, abi: decisionEngineAbi, functionName: "getAggregation", args: [id] })
-      : null;
-    const exe = reached("EXECUTED")
-      ? await publicClient.readContract({ address: ExecutionVault, abi: executionVaultAbi, functionName: "getExecution", args: [id] })
-      : null;
-    const out = reached("RESOLVED")
-      ? await publicClient.readContract({ address: OutcomeRegistry, abi: outcomeRegistryAbi, functionName: "getOutcome", args: [id] })
-      : null;
-    const settlement = out
-      ? await Promise.all(
-          r.participants.map(async (agentId) => {
-            const l = await publicClient.readContract({
-              address: OutcomeRegistry,
-              abi: outcomeRegistryAbi,
-              functionName: "getSettlement",
-              args: [id, agentId],
-            });
-            return {
-              agentId,
-              result: SETTLEMENT_RESULTS[l.result],
-              lockReleased: l.lockReleased,
-              penalty: l.penalty,
-              reward: l.reward,
-            };
-          }),
-        )
-      : null;
-
-    const transitions = await readTransitions(DecisionRegistry, id, r.statusBlock);
-
-    return ok({
-      id: r.id,
+    const decision: DecisionRecord = {
+      decisionId,
       status,
       stateHash: r.stateHash,
       questionsHash: r.questionsHash,
       proposer: r.proposer,
-      createdAt: Number(r.createdAt),
-      openedAt: Number(r.openedAt),
-      deadline: Number(r.deadline),
-      participants: r.participants.length,
-      roundReward: r.roundReward,
       config: {
         submissionWindow: Number(r.config.submissionWindow),
         horizon: Number(r.config.horizon),
@@ -202,35 +117,162 @@ export async function getDecision(id: bigint): Promise<Availability<DecisionDeta
         allowedForks: r.config.allowedForks,
         lockPerAgent: r.config.lockPerAgent,
       },
-      transitions,
+      createdAt: Number(r.createdAt),
+      openedAt: r.openedAt > 0n ? Number(r.openedAt) : null,
+      deadline: r.deadline > 0n ? Number(r.deadline) : null,
+      participants,
+      roundReward: r.roundReward,
+      transitions: await readTransitions(addr, id, r.statusBlock),
+    };
+    const txAt = (s: Status) => decision.transitions.find((t) => t.status === s)?.tx ?? null;
+
+    const agents: AgentRef[] = await Promise.all(
+      AGENTS.map(async (a) => {
+        const onChain = await publicClient.readContract({ address: addr.DecisionRegistry, abi: decisionRegistryAbi, functionName: "getAgent", args: [a.agentId] });
+        return { agentId: a.agentId, key: a.key, name: a.name, operator: onChain.operator as Address };
+      }),
+    );
+
+    const submissions: SubmissionRecord[] = (
+      await Promise.all(
+        participants.map(async (agentId) => {
+          const s = await publicClient.readContract({ address: addr.DecisionRegistry, abi: decisionRegistryAbi, functionName: "getSubmission", args: [id, agentId] });
+          if (s.submittedAt === 0n) return null;
+          return {
+            decisionId,
+            agentId,
+            choice: forkFromIndex(s.choice),
+            score: toScore(s.score),
+            probability: toProbability(s.probability),
+            reasonHash: s.reasonHash,
+            answersRoot: s.answersRoot,
+            submittedAt: Number(s.submittedAt),
+          } satisfies SubmissionRecord;
+        }),
+      )
+    ).filter((s): s is SubmissionRecord => s !== null);
+
+    let aggregation: Aggregation | null = null;
+    if (reached("AGGREGATED")) {
+      const g = await publicClient.readContract({ address: addr.DecisionEngine, abi: decisionEngineAbi, functionName: "getAggregation", args: [id] });
+      const pending = g.guardianRequired && status === "AGGREGATED";
+      aggregation = {
+        decisionId,
+        source: "engine",
+        inputs: [],
+        support: Object.fromEntries(FORKS.map((f, i) => [f, g.support[i]])) as Record<Fork, bigint>,
+        total: g.totalSupport,
+        leading: forkFromIndex(g.leading),
+        gates: null,
+        passed: g.thresholdPassed,
+        guardianRequired: g.guardianRequired,
+        guardianDeadline: g.guardianRequired ? Number(g.guardianDeadline) : null,
+        approved: pending ? null : executable(forkFromIndex(g.approved)),
+        submissions: g.submissions,
+      };
+    }
+
+    let action: Action | null = null;
+    if (aggregation && aggregation.approved && reached("APPROVED")) {
+      const approvedTx = txAt("APPROVED");
+      const approvedBy: Action["approvedBy"] = !aggregation.passed
+        ? "fail-safe"
+        : !aggregation.guardianRequired
+          ? "engine"
+          : approvedTx?.functionName === "finalizeEscalation"
+            ? "guardian-timeout"
+            : "guardian";
+      action = { decisionId, fork: aggregation.approved, definition: ACTION_SPACE[aggregation.approved], approvedBy, params: null, execution: null };
+      if (reached("EXECUTED")) {
+        const e = await publicClient.readContract({ address: addr.ExecutionVault, abi: executionVaultAbi, functionName: "getExecution", args: [id] });
+        action.execution = {
+          amountMoved: e.amountMoved,
+          after: { active: e.activeAfter, reserve: e.reserveAfter },
+          startPrice: { price: e.startPrice, expo: e.expo, publishTime: Number(e.startPublishTime) },
+          executedAt: Number(e.executedAt),
+          tx: txAt("EXECUTED"),
+        };
+      }
+    }
+
+    let outcome: Outcome | null = null;
+    if (reached("RESOLVED") && action?.execution) {
+      const o = await publicClient.readContract({ address: addr.OutcomeRegistry, abi: outcomeRegistryAbi, functionName: "getOutcome", args: [id] });
+      const from = action.execution.executedAt + decision.config.horizon;
+      const observed = o.isVoid
+        ? null
+        : {
+            start: action.execution.startPrice,
+            end: { price: o.endPrice, expo: action.execution.startPrice.expo, publishTime: Number(o.endPublishTime) },
+            moveBps: o.moveBps,
+            bandBps: decision.config.bandBps,
+            correctFork: executable(forkFromIndex(o.correctFork)),
+          };
+      outcome = {
+        decisionId,
+        expectedAction: action.fork,
+        observedResult: observed,
+        success: observed ? observed.correctFork === action.fork : null,
+        verificationSource: {
+          kind: "pyth",
+          chainId: MONAD_TESTNET.id,
+          contract: PYTH.contract,
+          feedId: PYTH.monUsdFeedId,
+          window: { from, to: from + RESOLUTION_TOLERANCE_SEC },
+        },
+        status: observed ? "VERIFIED" : "VOID",
+        timestamp: Number(o.resolvedAt),
+        tx: txAt("RESOLVED"),
+      };
+    }
+
+    const settlementStatus: SettlementStatus =
+      status === "CANCELLED" ? "RELEASED"
+      : status === "RESOLVED" ? (outcome?.status === "VOID" ? "VOID" : "SETTLED")
+      : status === "CREATED" ? "NOT_LOCKED"
+      : "LOCKED";
+
+    const lines = await Promise.all(
+      participants.map(async (agentId) => {
+        if (settlementStatus !== "SETTLED") {
+          return { decisionId, agentId, bond: decision.config.lockPerAgent, settlementStatus, result: null, reward: 0n, penalty: 0n, net: 0n };
+        }
+        const l = await publicClient.readContract({ address: addr.OutcomeRegistry, abi: outcomeRegistryAbi, functionName: "getSettlement", args: [id, agentId] });
+        return {
+          decisionId,
+          agentId,
+          bond: l.lockReleased,
+          settlementStatus,
+          result: SETTLEMENT_RESULTS[l.result] ?? null,
+          reward: l.reward,
+          penalty: l.penalty,
+          net: l.reward - l.penalty,
+        };
+      }),
+    );
+    const settlement: Settlement = {
+      decisionId,
+      settlementStatus,
+      lines,
+      roundReward: decision.roundReward,
+      // Only known exactly after settlement; derived from the settled lines.
+      toRewardPool:
+        settlementStatus === "SETTLED"
+          ? lines.reduce((t, l) => t + l.penalty - l.reward, 0n) + decision.roundReward
+          : settlementStatus === "NOT_LOCKED" || settlementStatus === "LOCKED" ? 0n : decision.roundReward,
+      tx: settlementStatus === "SETTLED" || settlementStatus === "VOID" ? txAt("RESOLVED") : settlementStatus === "RELEASED" ? txAt("CANCELLED") : null,
+    };
+
+    return ok({
+      decision,
+      state: { stateId: null, hash: decision.stateHash },
+      questions: { hash: decision.questionsHash },
+      agents,
       submissions,
-      aggregation: agg && {
-        support: [...agg.support],
-        totalSupport: agg.totalSupport,
-        leading: forkFromIndex(agg.leading),
-        thresholdPassed: agg.thresholdPassed,
-        approved: forkFromIndex(agg.approved),
-        guardianRequired: agg.guardianRequired,
-        guardianDeadline: Number(agg.guardianDeadline),
-        submissions: agg.submissions,
-      },
-      execution: exe && {
-        action: forkFromIndex(exe.action),
-        amountMoved: exe.amountMoved,
-        activeAfter: exe.activeAfter,
-        reserveAfter: exe.reserveAfter,
-        startPrice: exe.startPrice,
-        expo: exe.expo,
-        startPublishTime: Number(exe.startPublishTime),
-        executedAt: Number(exe.executedAt),
-      },
-      outcome: out && {
-        endPrice: out.endPrice,
-        endPublishTime: Number(out.endPublishTime),
-        moveBps: out.moveBps,
-        correctFork: forkFromIndex(out.correctFork),
-        resolvedAt: Number(out.resolvedAt),
-      },
+      parallel: null,
+      aggregation,
+      action,
+      outcome,
       settlement,
     });
   } catch (err) {
@@ -238,31 +280,55 @@ export async function getDecision(id: bigint): Promise<Availability<DecisionDeta
   }
 }
 
+// ─── Transactions ───────────────────────────────────────────────────────────
+
+const ABIS: Record<ContractName, Abi> = {
+  DecisionRegistry: decisionRegistryAbi,
+  DecisionEngine: decisionEngineAbi,
+  ExecutionVault: executionVaultAbi,
+  OutcomeRegistry: outcomeRegistryAbi,
+};
+
 /**
- * Transaction hash per lifecycle transition: StatusChanged logs are fetched at the exact
- * block recorded on-chain for each status, so no wide log-range queries are needed.
+ * Transaction per lifecycle transition. StatusChanged logs are fetched at the exact block
+ * recorded on-chain for each status (no wide log ranges); the transaction is then read
+ * and its calldata decoded against our ABIs to name the contract and function called.
  */
-async function readTransitions(registry: Hex, id: bigint, statusBlock: readonly bigint[]) {
-  const out: { status: Status; block: bigint; txHash: Hex | null }[] = [];
+async function readTransitions(addr: Record<ContractName, Address>, id: bigint, statusBlock: readonly bigint[]): Promise<LifecycleTransition[]> {
+  const out: LifecycleTransition[] = [];
   for (let i = 1; i < statusBlock.length; i++) {
-    const block = statusBlock[i];
-    if (!block) continue;
+    const blockNumber = statusBlock[i];
+    if (!blockNumber) continue;
     const status = statusFromIndex(i);
-    let txHash: Hex | null = null;
+    let tx: TxRef | null = null;
     try {
       const logs = await publicClient.getContractEvents({
-        address: registry,
+        address: addr.DecisionRegistry,
         abi: decisionRegistryAbi,
         eventName: "StatusChanged",
         args: { id },
-        fromBlock: block,
-        toBlock: block,
+        fromBlock: blockNumber,
+        toBlock: blockNumber,
       });
-      txHash = logs.find((l) => l.args.to === i)?.transactionHash ?? null;
+      const hash = logs.find((l) => l.args.to === i)?.transactionHash;
+      if (hash) tx = await describeTx(addr, hash, blockNumber);
     } catch {
-      txHash = null;
+      tx = null;
     }
-    out.push({ status, block, txHash });
+    out.push({ status, blockNumber, tx });
   }
   return out;
+}
+
+async function describeTx(addr: Record<ContractName, Address>, hash: Hex, blockNumber: bigint): Promise<TxRef | null> {
+  const t = await publicClient.getTransaction({ hash });
+  const contract = CONTRACT_NAMES.find((n) => addr[n].toLowerCase() === t.to?.toLowerCase());
+  if (!contract) return null;
+  let functionName = "unknown";
+  try {
+    functionName = decodeFunctionData({ abi: ABIS[contract], data: t.input }).functionName;
+  } catch {
+    /* selector not in our ABI; keep "unknown" rather than guessing */
+  }
+  return { chainId: MONAD_TESTNET.id, hash, blockNumber, contract, functionName };
 }

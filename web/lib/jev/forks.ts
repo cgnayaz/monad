@@ -1,51 +1,19 @@
 import { FORKS, type Fork } from "@/lib/types/protocol";
+import { ACTION_SPACE, type ForkSpace, type ProtocolAction } from "@/lib/model/action";
 
 /**
  * Jev Bounded Forks (JEV_INTEGRATION.md §8).
  *
- * The fork set is closed and fixed at compile time, matching the Solidity enum.
- * Agents choose a label from this set; they never supply amounts, addresses or calldata.
+ * The fork set is closed and fixed at compile time, matching the Solidity enum. Each
+ * fork maps to exactly one entry of ACTION_SPACE. Agents choose a label from this set;
+ * they never supply amounts, addresses or calldata.
  */
 
-export interface ForkSpec {
-  fork: Fork;
-  alias: "NO_ACTION" | "ACTION_A" | "ACTION_B" | "ESCALATE";
-  label: string;
-  effect: string;
-  executable: boolean; // false → requires a guardian before anything executes
-}
+export type { ForkSpace, ProtocolAction } from "@/lib/model/action";
+export { ACTION_SPACE } from "@/lib/model/action";
 
-export const FORK_SPECS: Record<Fork, ForkSpec> = {
-  NO_ACTION: {
-    fork: "NO_ACTION",
-    alias: "NO_ACTION",
-    label: "No action",
-    effect: "Nothing moves. The start price is still recorded so the decision remains verifiable.",
-    executable: true,
-  },
-  DERISK: {
-    fork: "DERISK",
-    alias: "ACTION_A",
-    label: "De-risk",
-    effect: "Move min(actionBps × ACTIVE, maxMove) from ACTIVE to RESERVE.",
-    executable: true,
-  },
-  DEPLOY: {
-    fork: "DEPLOY",
-    alias: "ACTION_B",
-    label: "Deploy",
-    effect: "Move min(actionBps × RESERVE, maxMove) from RESERVE to ACTIVE.",
-    executable: true,
-  },
-  ESCALATE: {
-    fork: "ESCALATE",
-    alias: "ESCALATE",
-    label: "Escalate",
-    effect:
-      "No automatic action. A guardian selects NO_ACTION, DERISK or DEPLOY before a deadline; otherwise NO_ACTION.",
-    executable: false,
-  },
-};
+/** Backwards-compatible name for the action table used by the UI. */
+export const FORK_SPECS: Readonly<Record<Fork, ProtocolAction>> = ACTION_SPACE;
 
 export const ALL_FORKS_MASK = FORKS.reduce((m, _f, i) => m | (1 << i), 0);
 
@@ -55,6 +23,13 @@ export function forksToMask(forks: readonly Fork[]): number {
 
 export function maskToForks(mask: number): Fork[] {
   return FORKS.filter((_f, i) => (mask & (1 << i)) !== 0);
+}
+
+/** The allowed action space for one decision, fixed before any agent runs. */
+export function forkSpace(allowed: readonly Fork[] = FORKS): ForkSpace {
+  const unique = FORKS.filter((f) => allowed.includes(f));
+  if (!unique.includes("NO_ACTION")) throw new Error("NO_ACTION must always be allowed (fail-safe)");
+  return { allowed: unique, mask: forksToMask(unique) };
 }
 
 /** Closed mapping from a model-provided label to a fork. Anything else is rejected. */

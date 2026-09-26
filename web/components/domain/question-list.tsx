@@ -6,17 +6,18 @@ export function QuestionList({ set }: { set: QuestionSet }) {
   return (
     <ol className="border border-rule bg-surface">
       {set.questions.map((q) => {
-        const answeredBy = AGENTS.filter((a) => set.assignment[a.key].includes(q.id));
+        const answeredBy = AGENTS.filter((a) => set.assignment[a.key].includes(q.questionId));
         const totalWeight = q.rubric.reduce((t, f) => t + f.weight, 0);
         return (
-          <li key={q.id} className="grid gap-4 border-b border-rule px-4 py-4 last:border-b-0 md:grid-cols-[72px_1fr_280px]">
+          <li key={q.questionId} className="grid gap-4 border-b border-rule px-4 py-4 last:border-b-0 md:grid-cols-[72px_1fr_280px]">
             <div className="flex items-baseline gap-2 md:flex-col md:gap-1">
-              <span className="font-mono text-[12px] text-ink-3">Q{q.id}</span>
-              <span className="text-[11px] font-medium tracking-[0.06em] text-ink-2">{q.key}</span>
+              <span className="font-mono text-[12px] text-ink-3">Q{q.index}</span>
+              <span className="text-[11px] font-medium tracking-[0.06em] text-ink-2">{q.category}</span>
             </div>
             <div>
               <p className="text-[14px] leading-[22px]">{q.text}</p>
-              <p className="mt-2 text-[12px] text-ink-2">
+              <p className="mt-2 font-mono text-[11.5px] text-ink-3" title={`stateId ${q.stateId}`}>{q.questionId}</p>
+              <p className="mt-1 text-[12px] text-ink-2">
                 Answered by {answeredBy.length === AGENTS.length ? "all five agents" : answeredBy.map((a) => a.name).join(", ")}
               </p>
             </div>

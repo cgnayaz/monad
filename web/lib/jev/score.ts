@@ -1,5 +1,6 @@
 import { SCORE_MAX } from "@/lib/types/protocol";
-import type { RubricFactor } from "./questions";
+import { toScore, type Score } from "@/lib/model/primitives";
+import type { RubricFactor } from "@/lib/model/question";
 
 /**
  * Jev Score (JEV_INTEGRATION.md §4).
@@ -14,7 +15,7 @@ export const RATING_MAX = 4;
 
 export type Rating = 0 | 1 | 2 | 3 | 4;
 
-export function computeScore(rubric: readonly RubricFactor[], ratings: Record<string, Rating>): number {
+export function computeScore(rubric: readonly RubricFactor[], ratings: Record<string, Rating>): Score {
   let num = 0;
   let den = 0;
   for (const f of rubric) {
@@ -25,5 +26,5 @@ export function computeScore(rubric: readonly RubricFactor[], ratings: Record<st
   }
   if (den === 0) throw new Error("Rubric has no weight");
   // Integer round-half-up: floor((2·S·num + den) / (2·den))
-  return Math.floor((2 * SCORE_MAX * num + den) / (2 * den));
+  return toScore(Math.floor((2 * SCORE_MAX * num + den) / (2 * den)));
 }

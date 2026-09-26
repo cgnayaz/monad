@@ -1,45 +1,35 @@
-import type { AgentKey, Fork, Hex, QuestionKey } from "@/lib/types/protocol";
+import type { AgentKey, Fork } from "@/lib/types/protocol";
 import { FORKS } from "@/lib/types/protocol";
+import type { UnixSeconds } from "@/lib/model/primitives";
+import {
+  QUESTIONS_VERSION,
+  type Question,
+  type QuestionId,
+  type QuestionSet,
+  type QuestionTemplate,
+} from "@/lib/model/question";
+import type { StateRecord } from "@/lib/model/state";
 import { hashCanonical } from "./canonical";
 
 /**
  * Jev Questions (JEV_INTEGRATION.md §2).
  *
- * Questions are explicit, versioned data. They are rendered verbatim in the UI and
+ * Templates are versioned data; for each state they are instantiated into Questions
+ * with their own content-derived ids. Questions are rendered verbatim in the UI and
  * hashed into `questionsHash`; prompts are derived from them, never the other way round.
  */
 
-export const QUESTIONS_SCHEMA = "decmarkt.jev.questions/1" as const;
+export type { Question, QuestionId, QuestionSet, QuestionTemplate, RubricFactor } from "@/lib/model/question";
+
 export const RUBRIC_VERSION = "rubric/1" as const;
-
-export interface RubricFactor {
-  factor: string; // stable snake_case id
-  description: string;
-  weight: number; // positive integer
-}
-
-export interface JevQuestion {
-  id: number;
-  key: QuestionKey;
-  text: string;
-  inputKeys: string[]; // state input key prefixes this question relies on
-  rubric: RubricFactor[];
-  allowedForks: Fork[];
-}
-
-export interface QuestionSet {
-  schema: typeof QUESTIONS_SCHEMA;
-  rubricVersion: typeof RUBRIC_VERSION;
-  questions: JevQuestion[];
-  assignment: Record<AgentKey, number[]>;
-}
+export const ACTION_QUESTION_INDEX = 0;
 
 const ALL: Fork[] = [...FORKS];
 
-export const QUESTIONS: JevQuestion[] = [
+export const QUESTION_TEMPLATES: readonly QuestionTemplate[] = [
   {
-    id: 0,
-    key: "ACTION",
+    index: 0,
+    category: "ACTION",
     text: "Given the state, which bounded action should the vault take for the next horizon?",
     inputKeys: ["market.", "history.", "network.", "vault.", "protocol.", "record."],
     rubric: [
@@ -50,8 +40,8 @@ export const QUESTIONS: JevQuestion[] = [
     allowedForks: ALL,
   },
   {
-    id: 1,
-    key: "RISK",
+    index: 1,
+    category: "RISK",
     text: "What is the downside risk to the vault's MON value over the horizon?",
     inputKeys: ["market.", "history.", "vault."],
     rubric: [
@@ -62,8 +52,8 @@ export const QUESTIONS: JevQuestion[] = [
     allowedForks: ALL,
   },
   {
-    id: 2,
-    key: "YIELD",
+    index: 2,
+    category: "YIELD",
     text: "What is the expected opportunity of increasing deployed funds over the horizon?",
     inputKeys: ["market.", "history.", "vault."],
     rubric: [
@@ -74,8 +64,8 @@ export const QUESTIONS: JevQuestion[] = [
     allowedForks: ALL,
   },
   {
-    id: 3,
-    key: "SECURITY",
+    index: 3,
+    category: "SECURITY",
     text: "Are there security or operational concerns (oracle staleness, confidence width, paused contracts, network health)?",
     inputKeys: ["market.", "network.", "protocol."],
     rubric: [
@@ -86,8 +76,8 @@ export const QUESTIONS: JevQuestion[] = [
     allowedForks: ALL,
   },
   {
-    id: 4,
-    key: "MARKET",
+    index: 4,
+    category: "MARKET",
     text: "What does current market information suggest about direction over the horizon?",
     inputKeys: ["market."],
     rubric: [
@@ -98,8 +88,8 @@ export const QUESTIONS: JevQuestion[] = [
     allowedForks: ALL,
   },
   {
-    id: 5,
-    key: "HISTORY",
+    index: 5,
+    category: "HISTORY",
     text: "What do historical prices and past decision outcomes suggest?",
     inputKeys: ["history.", "record."],
     rubric: [
@@ -111,8 +101,8 @@ export const QUESTIONS: JevQuestion[] = [
   },
 ];
 
-/** Default batch assignment: primary question + ACTION (JEV_INTEGRATION.md §9). */
-export const DEFAULT_ASSIGNMENT: Record<AgentKey, number[]> = {
+/** Default batch assignment by template index: primary question + ACTION (JEV_INTEGRATION.md §9). */
+export const DEFAULT_ASSIGNMENT: Readonly<Record<AgentKey, readonly number[]>> = {
   RISK: [1, 0],
   YIELD: [2, 0],
   SECURITY: [3, 0],
@@ -120,20 +110,48 @@ export const DEFAULT_ASSIGNMENT: Record<AgentKey, number[]> = {
   HISTORY: [5, 0],
 };
 
-export function buildQuestionSet(): { questionSet: QuestionSet; questionsHash: Hex } {
-  const questionSet: QuestionSet = {
-    schema: QUESTIONS_SCHEMA,
-    rubricVersion: RUBRIC_VERSION,
-    questions: QUESTIONS,
-    assignment: DEFAULT_ASSIGNMENT,
-  };
-  return { questionSet, questionsHash: hashCanonical(questionSet) };
+/** Content-derived id: the same template on the same state always has the same id. */
+export function questionIdFor(stateId: string, t: QuestionTemplate): QuestionId {
+  return `qn_${hashCanonical({ stateId, index: t.index, category: t.category, text: t.text }).slice(2, 18)}` as QuestionId;
 }
 
-export function questionById(set: QuestionSet, id: number): JevQuestion {
-  const q = set.questions.find((x) => x.id === id);
+/** Instantiate the question templates for one state. */
+export function buildQuestionSet(state: StateRecord, createdAt: UnixSeconds): QuestionSet {
+  const questions: Question[] = QUESTION_TEMPLATES.map((t) => ({
+    ...t,
+    inputKeys: [...t.inputKeys],
+    rubric: t.rubric.map((f) => ({ ...f })),
+    allowedForks: [...t.allowedForks],
+    questionId: questionIdFor(state.stateId, t),
+    stateId: state.stateId,
+    createdAt,
+  }));
+  const byIndex = (i: number) => questions.find((q) => q.index === i)!.questionId;
+  const assignment = Object.fromEntries(
+    Object.entries(DEFAULT_ASSIGNMENT).map(([agent, idx]) => [agent, idx.map(byIndex)]),
+  ) as Record<AgentKey, QuestionId[]>;
+  const body = { version: QUESTIONS_VERSION, rubricVersion: RUBRIC_VERSION, stateId: state.stateId, createdAt, questions, assignment };
+  return { ...body, hash: hashCanonical(body) };
+}
+
+export function computeQuestionSetHash(set: QuestionSet) {
+  const { hash: _omit, ...body } = set;
+  void _omit;
+  return hashCanonical(body);
+}
+
+export function questionById(set: QuestionSet, id: QuestionId): Question {
+  const q = set.questions.find((x) => x.questionId === id);
   if (!q) throw new Error(`Unknown question ${id}`);
   return q;
 }
 
-export const ACTION_QUESTION_ID = 0;
+export function questionByIndex(set: QuestionSet, index: number): Question {
+  const q = set.questions.find((x) => x.index === index);
+  if (!q) throw new Error(`Unknown question index ${index}`);
+  return q;
+}
+
+export function assignedQuestions(set: QuestionSet, agent: AgentKey): Question[] {
+  return set.assignment[agent].map((id) => questionById(set, id));
+}

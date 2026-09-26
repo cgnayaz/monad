@@ -29,10 +29,10 @@ const STAGES = [
 ] as const;
 
 export default async function DemoPage() {
-  const [committed, agents] = await Promise.all([collectState(), listAgents()]);
-  const { questionSet, questionsHash } = buildQuestionSet();
+  const [state, agents] = await Promise.all([collectState(), listAgents()]);
+  const questionSet = buildQuestionSet(state, state.timestamp);
   const r = readiness();
-  const okInputs = committed.state.inputs.filter((i) => i.status === "ok").length;
+  const okInputs = state.data.inputs.filter((i) => i.status === "ok").length;
 
   return (
     <>
@@ -79,27 +79,28 @@ export default async function DemoPage() {
             hashed exactly as a round would commit it, but nothing is written on-chain until a round starts.
           </>
         }
-        aside={<StatusMark tone={okInputs === committed.state.inputs.length ? "pass" : "wait"}>{okInputs}/{committed.state.inputs.length} inputs available</StatusMark>}
+        aside={<StatusMark tone={okInputs === state.data.inputs.length ? "pass" : "wait"}>{okInputs}/{state.data.inputs.length} inputs available</StatusMark>}
       >
         <div className="mb-4 border border-rule bg-surface">
           <KeyValue
             rows={[
-              { k: "State id", v: <span className="font-mono text-[12.5px]">{committed.state.stateId}</span> },
-              { k: "State hash", v: <Hash value={committed.stateHash} full /> },
-              { k: "Observed", v: <span className="font-mono text-[12.5px]">{formatUtc(committed.state.observedAt)}</span> },
-              { k: "Subject", v: `MON vault · reference ${committed.state.subject.referenceFeed} · horizon ${formatDuration(committed.state.subject.horizonSec)} · band ±${committed.state.subject.bandBps} bps` },
-              { k: "Schema", v: <span className="font-mono text-[12.5px]">{committed.state.schema}</span> },
+              { k: "State id", v: <span className="font-mono text-[12.5px]">{state.stateId}</span> },
+              { k: "State hash", v: <Hash value={state.hash} full /> },
+              { k: "Timestamp", v: <span className="font-mono text-[12.5px]">{formatUtc(state.timestamp)}</span> },
+              { k: "Sources", v: <span className="font-mono text-[12.5px]">{state.source.join(" · ")}</span> },
+              { k: "Subject", v: `MON vault · reference ${state.data.subject.referenceFeed} · horizon ${formatDuration(state.data.subject.horizonSec)} · band ±${state.data.subject.bandBps} bps` },
+              { k: "Version", v: <span className="font-mono text-[12.5px]">{state.version}</span> },
             ]}
           />
         </div>
-        <StateTable inputs={committed.state.inputs} />
+        <StateTable inputs={state.data.inputs} />
       </Section>
 
       <Section
         index="02"
         title="Jev questions"
         description="What the agents actually evaluate. Each agent answers its primary question and the action question; every answer is a full Jev decision."
-        aside={<span className="font-mono text-[12px] text-ink-2" title={questionsHash}>questionsHash {questionsHash.slice(0, 10)}…</span>}
+        aside={<span className="font-mono text-[12px] text-ink-2" title={questionSet.hash}>questionsHash {questionSet.hash.slice(0, 10)}…</span>}
       >
         <QuestionList set={questionSet} />
       </Section>

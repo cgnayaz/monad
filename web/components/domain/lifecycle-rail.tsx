@@ -1,18 +1,13 @@
 import { explorer } from "@/lib/chain/monad";
 import { shortHex } from "@/lib/format";
-import { LIFECYCLE, STATUSES, type Hex, type Status } from "@/lib/types/protocol";
-
-export interface Transition {
-  status: Status;
-  block: bigint;
-  txHash: Hex | null;
-}
+import type { LifecycleTransition } from "@/lib/model/transaction";
+import { LIFECYCLE, STATUSES, type Status } from "@/lib/types/protocol";
 
 /**
- * The seven-state lifecycle (CONTRACT_SPEC.md §3). Each reached step shows the block and
- * transaction that produced it. With no decision, the rail shows the lifecycle itself.
+ * The seven-state lifecycle (CONTRACT_SPEC.md §3). Each reached step shows the transaction
+ * (or at least the block) that produced it. With no decision, the rail shows the lifecycle.
  */
-export function LifecycleRail({ current, transitions = [] }: { current?: Status; transitions?: Transition[] }) {
+export function LifecycleRail({ current, transitions = [] }: { current?: Status; transitions?: LifecycleTransition[] }) {
   const cancelled = current === "CANCELLED";
   const currentIdx = current ? STATUSES.indexOf(current) : -1;
   return (
@@ -20,7 +15,6 @@ export function LifecycleRail({ current, transitions = [] }: { current?: Status;
       <ol className="grid grid-cols-2 border border-rule bg-surface sm:grid-cols-3 lg:grid-cols-6">
         {LIFECYCLE.map((s, i) => {
           const t = transitions.find((x) => x.status === s);
-          const reached = !!t;
           const isCurrent = current === s;
           return (
             <li
@@ -29,22 +23,19 @@ export function LifecycleRail({ current, transitions = [] }: { current?: Status;
                 isCurrent ? "bg-surface-2" : ""
               }`}
             >
-              <span
-                aria-hidden
-                className={`absolute inset-x-0 top-0 h-0.5 ${isCurrent ? "bg-accent" : reached ? "bg-ink" : "bg-transparent"}`}
-              />
+              <span aria-hidden className={`absolute inset-x-0 top-0 h-0.5 ${isCurrent ? "bg-accent" : t ? "bg-ink" : "bg-transparent"}`} />
               <div className="flex items-baseline gap-2">
                 <span className="font-mono text-[11px] text-ink-3">{String(i + 1).padStart(2, "0")}</span>
-                <span className={`text-[12px] font-medium tracking-[0.04em] ${reached || isCurrent ? "text-ink" : "text-ink-3"}`}>{s}</span>
+                <span className={`text-[12px] font-medium tracking-[0.04em] ${t || isCurrent ? "text-ink" : "text-ink-3"}`}>{s}</span>
               </div>
               <div className="mt-1 min-h-[20px] font-mono text-[11.5px] text-ink-2">
                 {t ? (
-                  t.txHash ? (
-                    <a href={explorer.tx(t.txHash)} target="_blank" rel="noreferrer" className="underline decoration-rule underline-offset-2 hover:decoration-ink">
-                      {shortHex(t.txHash, 4, 4)}
+                  t.tx ? (
+                    <a href={explorer.tx(t.tx.hash)} target="_blank" rel="noreferrer" title={`${t.tx.contract}.${t.tx.functionName}`} className="underline decoration-rule underline-offset-2 hover:decoration-ink">
+                      {shortHex(t.tx.hash, 4, 4)}
                     </a>
                   ) : (
-                    <span>block {t.block.toString()}</span>
+                    <span>block {t.blockNumber.toString()}</span>
                   )
                 ) : current && !cancelled && currentIdx >= 0 && STATUSES.indexOf(s) > currentIdx ? (
                   <span className="text-ink-3">pending</span>
@@ -54,9 +45,7 @@ export function LifecycleRail({ current, transitions = [] }: { current?: Status;
           );
         })}
       </ol>
-      {cancelled && (
-        <p className="mt-2 text-[12px] text-fail">CANCELLED — bond locks released, no settlement.</p>
-      )}
+      {cancelled && <p className="mt-2 text-[12px] text-fail">CANCELLED — bond locks released, no settlement.</p>}
     </div>
   );
 }

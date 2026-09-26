@@ -16,17 +16,17 @@ Code location: `web/lib/jev/` (TypeScript) and the Jev-derived fields in
 
 | Jev concept | DecMarkt object | Code | On-chain anchor |
 |---|---|---|---|
-| State | `JevState` (canonical JSON, versioned) | `jev/state.ts` | `Decision.stateHash` |
-| Questions | `JevQuestion[]` in a `QuestionSet` | `jev/questions.ts` | `Decision.questionsHash` |
-| Choice | `Fork` enum value | `jev/forks.ts` | `Submission.choice` (uint8) |
-| Score | rubric-derived integer, 0–10000 | `jev/score.ts` | `Submission.score` (uint16) |
-| Probability | calibrated confidence, 100–9900 bps | `jev/primitives.ts` | `Submission.probability` (uint16) |
+| State | `StateRecord` (canonical JSON, versioned) | `model/state.ts`, `jev/state.ts` | `Decision.stateHash` |
+| Questions | `Question` (own id) in a `QuestionSet` | `model/question.ts`, `jev/questions.ts` | `Decision.questionsHash` |
+| Choice | branded `Choice` (fork enum) | `model/primitives.ts` | `Submission.choice` (uint8) |
+| Score | branded `Score`, rubric-derived 0–10000 | `model/primitives.ts`, `jev/score.ts` | `Submission.score` (uint16) |
+| Probability | branded `Probability`, 100–9900 bps | `model/primitives.ts` | `Submission.probability` (uint16) |
 | Reason | human-readable text | `jev/primitives.ts` | `Submission.reasonHash` |
-| Parallel Decisions | 5 isolated agent runs | `jev/parallel.ts` | 5 independent `submit` txs |
-| Batch Decisions | all (agent × question) answers | `jev/batch.ts` | `Submission.answersRoot` (Merkle) |
+| Parallel Decisions | `ParallelDecisions` (one `AgentRun` per agent) | `jev/parallel.ts` | 5 independent `submit` txs |
+| Batch Decisions | `DecisionBatch` of `AgentDecision`s | `jev/batch.ts` | `Submission.answersRoot` (Merkle) |
 | Bounded Forks | fixed 4-fork set + per-decision mask | `jev/forks.ts` | `Decision.allowedForks`, `Fork` enum |
-| Action | approved fork → vault operation | — | `ExecutionVault.execute` |
-| Verify | oracle outcome + integrity checks | `jev/verify.ts` | `OutcomeRegistry.resolve` |
+| Action | `Action` → entry of `ACTION_SPACE` | `model/action.ts`, `jev/action.ts` | `ExecutionVault.execute` |
+| Verify | `Outcome` + integrity checks | `model/outcome.ts`, `jev/verify.ts` | `OutcomeRegistry.resolve` |
 
 ---
 
@@ -35,22 +35,23 @@ Code location: `web/lib/jev/` (TypeScript) and the Jev-derived fields in
 The information available to the agents *before* they decide. Nothing else is given to them.
 
 ```ts
-interface JevState {
-  schema: "decmarkt.jev.state/1";      // versioned schema id
-  stateId: string;                     // "st_" + first 16 hex of stateHash
-  subject: { vault: Address; asset: "MON"; referenceFeed: "MON/USD"; horizonSec: number; bandBps: number };
-  observedAt: number;                  // unix seconds, server clock at collection
-  inputs: StateInput[];                // only decision-relevant facts
+interface StateRecord {              // web/lib/model/state.ts
+  stateId: `st_${string}`;           // derived from content
+  version: "decmarkt.jev.state/1";
+  source: StateSource[];             // contributing sources
+  timestamp: number;                 // unix seconds at collection
+  data: { subject: StateSubject; inputs: StateInput[] };
+  hash: Hex;                         // committed on-chain as Decision.stateHash
 }
 interface StateInput {
-  key: string;                         // e.g. "market.mon_usd.price"
-  value: string | number | null;       // null ⇔ unavailable
+  key: string;                       // e.g. "market.mon_usd.price"
+  value: string | number | null;     // null ⇔ unavailable
   unit?: string;
   source: "pyth-hermes" | "monad-rpc" | "decision-registry" | "execution-vault";
-  sourceRef?: string;                  // block number, Pyth publishTime, URL path
+  sourceRef?: string;                // block number, Pyth publishTime
   observedAt: number;
   status: "ok" | "unavailable" | "stale";
-  note?: string;                       // why unavailable / stale
+  note?: string;                     // why unavailable / stale
 }
 ```
 
@@ -67,9 +68,9 @@ Inputs in v1 (all real, fetched at collection time):
 
 Properties required by the brief:
 - **Structured** — typed schema, validated by Zod before hashing.
-- **Versioned** — `schema` field; scoring rubric version stored alongside.
+- **Versioned** — `version` field; scoring rubric version stored with the questions.
 - **Traceable** — each input carries `source`, `sourceRef`, `observedAt`.
-- **Hashable** — `stateHash = keccak256(utf8(JCS(state)))` (RFC 8785 canonical JSON).
+- **Hashable** — `hash = keccak256(utf8(JCS(record without hash)))` (RFC 8785 canonical JSON).
 - **Referenced by the decision** — `stateHash` is written in `createDecision` *before* any
   agent runs; every answer leaf includes the `decisionId` which binds to that hash.
 
@@ -78,18 +79,22 @@ Properties required by the brief:
 Questions are explicit data, rendered in the UI and hashed — never hidden inside prompts.
 
 ```ts
-interface JevQuestion {
-  id: number;                          // 0..5, stable, used in Merkle leaves
-  key: "ACTION" | "RISK" | "YIELD" | "SECURITY" | "MARKET" | "HISTORY";
-  text: string;                        // the question, shown verbatim in the UI
-  inputKeys: string[];                 // which state inputs are relevant
-  rubric: RubricFactor[];              // factors that produce the deterministic score
-  allowedForks: Fork[];                // what a choice for this question may be
+interface Question {                 // web/lib/model/question.ts — a template instantiated for one state
+  questionId: `qn_${string}`;        // content-derived, identifiable on its own
+  stateId: StateId;
+  text: string;                      // shown verbatim in the UI
+  category: "ACTION" | "RISK" | "YIELD" | "SECURITY" | "MARKET" | "HISTORY";
+  createdAt: number;
+  index: number;                     // 0..5, uint8 slot in Merkle leaves
+  inputKeys: string[];               // relevant state input prefixes
+  rubric: RubricFactor[];            // produce the deterministic score
+  allowedForks: Fork[];
 }
-interface QuestionSet { schema: "decmarkt.jev.questions/1"; questions: JevQuestion[]; assignment: Record<AgentKey, number[]> }
+interface QuestionSet { version; rubricVersion; stateId; createdAt; questions: Question[];
+                        assignment: Record<AgentKey, QuestionId[]>; hash: Hex }
 ```
 
-| id | key | Question |
+| index | category | Question |
 |---|---|---|
 | 0 | ACTION | Given the state, which bounded action should the vault take for the next horizon? |
 | 1 | RISK | What is the downside risk to the vault's MON value over the horizon? |
@@ -98,7 +103,9 @@ interface QuestionSet { schema: "decmarkt.jev.questions/1"; questions: JevQuesti
 | 4 | MARKET | What does current market information suggest about direction over the horizon? |
 | 5 | HISTORY | What do historical prices and past decision outcomes suggest? |
 
-`questionsHash = keccak256(JCS(questionSet))`, committed in `createDecision`.
+`questionsHash = keccak256(JCS(questionSet without hash))`, committed in `createDecision`.
+Because each question's id includes the `stateId`, a question can be referenced on its own
+and still points unambiguously to the state it was asked about.
 
 ## 3. Choice
 

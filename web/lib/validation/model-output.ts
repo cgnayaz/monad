@@ -1,18 +1,19 @@
 import { z } from "zod";
 import { FORKS, PROBABILITY_MAX, PROBABILITY_MIN } from "@/lib/types/protocol";
-import type { JevState } from "@/lib/jev/state";
-import type { QuestionSet } from "@/lib/jev/questions";
+import type { Question } from "@/lib/model/question";
+import type { StateRecord } from "@/lib/model/state";
 
 /**
  * The only shape accepted from an AI model (DATA_MODEL.md §3).
  *
  * `WireOutput` is sent to the provider as the structured-output schema. It carries no
  * numeric bounds because providers may not enforce them; `validateModelOutput` is the
- * authoritative check and runs on every response.
+ * authoritative check and runs on every response. The model refers to questions by
+ * their on-chain index; ids are attached afterwards by the Jev layer.
  */
 
 export const WireAnswer = z.object({
-  questionId: z.number().int(),
+  questionIndex: z.number().int(),
   choice: z.enum(FORKS),
   probability: z.number().int(),
   factors: z.array(
@@ -29,7 +30,7 @@ export const WireOutput = z.object({ answers: z.array(WireAnswer) });
 
 const StrictAnswer = z
   .object({
-    questionId: z.number().int().min(0).max(5),
+    questionIndex: z.number().int().min(0).max(5),
     choice: z.enum(FORKS),
     probability: z.number().int().min(PROBABILITY_MIN).max(PROBABILITY_MAX),
     factors: z
@@ -56,43 +57,37 @@ export type Validation =
   | { ok: false; errors: string[] };
 
 /**
- * Schema validation plus semantic checks against the committed state and question set:
- * exact question assignment, exact rubric factors, evidence keys that exist in the
- * state, and choices inside each question's allowed forks.
+ * Schema validation plus semantic checks against the committed state and the agent's
+ * assigned questions: exact question coverage, exact rubric factors, evidence keys that
+ * exist in the state, and choices inside each question's allowed forks.
  */
-export function validateModelOutput(
-  raw: unknown,
-  ctx: { state: JevState; questionSet: QuestionSet; assigned: number[] },
-): Validation {
+export function validateModelOutput(raw: unknown, ctx: { state: StateRecord; assigned: Question[] }): Validation {
   const parsed = StrictOutput.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, errors: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) };
   }
   const errors: string[] = [];
   const answers = parsed.data.answers;
-  const stateKeys = new Set(ctx.state.inputs.map((i) => i.key));
+  const stateKeys = new Set(ctx.state.data.inputs.map((i) => i.key));
 
-  const got = answers.map((a) => a.questionId).sort();
-  const want = [...ctx.assigned].sort();
+  const got = answers.map((a) => a.questionIndex).sort();
+  const want = ctx.assigned.map((q) => q.index).sort();
   if (got.length !== want.length || got.some((q, i) => q !== want[i])) {
     errors.push(`answers must cover exactly questions [${want.join(", ")}], got [${got.join(", ")}]`);
   }
 
   for (const a of answers) {
-    const q = ctx.questionSet.questions.find((x) => x.id === a.questionId);
-    if (!q) {
-      errors.push(`q${a.questionId}: unknown question`);
-      continue;
-    }
-    if (!q.allowedForks.includes(a.choice)) errors.push(`q${a.questionId}: choice ${a.choice} not allowed`);
+    const q = ctx.assigned.find((x) => x.index === a.questionIndex);
+    if (!q) continue; // already reported above
+    if (!q.allowedForks.includes(a.choice)) errors.push(`q${a.questionIndex}: choice ${a.choice} not allowed`);
     const rubric = q.rubric.map((f) => f.factor).sort();
     const rated = a.factors.map((f) => f.factor).sort();
     if (rubric.length !== rated.length || rubric.some((f, i) => f !== rated[i])) {
-      errors.push(`q${a.questionId}: factors must be exactly [${rubric.join(", ")}]`);
+      errors.push(`q${a.questionIndex}: factors must be exactly [${rubric.join(", ")}]`);
     }
     for (const f of a.factors) {
       for (const k of f.evidence) {
-        if (!stateKeys.has(k)) errors.push(`q${a.questionId}.${f.factor}: evidence key ${k} not in state`);
+        if (!stateKeys.has(k)) errors.push(`q${a.questionIndex}.${f.factor}: evidence key ${k} not in state`);
       }
     }
   }

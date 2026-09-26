@@ -1,81 +1,52 @@
-import type { Address, Hex } from "@/lib/types/protocol";
-import { JevStateSchema } from "@/lib/validation/state";
+import type { Hex } from "@/lib/types/protocol";
+import {
+  STATE_VERSION,
+  type StateId,
+  type StateInput,
+  type StateRecord,
+  type StateSource,
+  type StateSubject,
+} from "@/lib/model/state";
+import type { UnixSeconds } from "@/lib/model/primitives";
+import { StateBodySchema } from "@/lib/validation/state";
 import { hashCanonical } from "./canonical";
 
 /**
- * Jev State (JEV_INTEGRATION.md §1).
- *
- * The complete information available to agents before they decide. Structured,
- * versioned, traceable (each input carries its source) and hashable (JCS + keccak256).
+ * Jev State construction (JEV_INTEGRATION.md §1). Produces a StateRecord:
+ * structured, versioned, traceable per input, and hashed.
  */
 
-export const STATE_SCHEMA = "decmarkt.jev.state/1" as const;
-
-export type StateSource = "pyth-hermes" | "monad-rpc" | "decision-registry" | "execution-vault";
-export type InputStatus = "ok" | "unavailable" | "stale";
-
-export interface StateInput {
-  key: string;
-  value: string | number | null; // null ⇔ not ok
-  unit?: string;
-  source: StateSource;
-  sourceRef?: string;
-  observedAt: number;
-  status: InputStatus;
-  note?: string;
-}
-
-export interface StateSubject {
-  vault: Address | null; // null until ExecutionVault is deployed
-  asset: "MON";
-  referenceFeed: "MON/USD";
-  horizonSec: number;
-  bandBps: number;
-}
-
-export interface JevState {
-  schema: typeof STATE_SCHEMA;
-  stateId: string;
-  subject: StateSubject;
-  observedAt: number;
-  inputs: StateInput[];
-}
-
-export interface CommittedState {
-  state: JevState;
-  stateHash: Hex;
-}
+export type { StateInput, StateRecord, StateSource, StateSubject } from "@/lib/model/state";
 
 /**
- * Build and hash a state. `stateId` is derived from the hash of the state without the
- * id, so the id itself is reproducible from the content.
+ * Build a StateRecord. Inputs are sorted by key and sources de-duplicated so that the
+ * same content always yields the same stateId and hash.
  */
-export function buildState(subject: StateSubject, inputs: StateInput[], observedAt: number): CommittedState {
+export function buildState(subject: StateSubject, inputs: StateInput[], timestamp: UnixSeconds): StateRecord {
   const sorted = [...inputs].sort((a, b) => a.key.localeCompare(b.key));
-  const body = { schema: STATE_SCHEMA, subject, observedAt, inputs: sorted };
-  const idHash = hashCanonical(body);
-  const state: JevState = { ...body, stateId: `st_${idHash.slice(2, 18)}` };
-  const parsed = JevStateSchema.parse(state);
-  return { state: parsed as JevState, stateHash: hashCanonical(parsed) };
+  const source = [...new Set(sorted.map((i) => i.source))].sort() as StateSource[];
+  const content = { version: STATE_VERSION, source, timestamp, data: { subject, inputs: sorted } };
+  const stateId = `st_${hashCanonical(content).slice(2, 18)}` as StateId;
+  const body = StateBodySchema.parse({ stateId, ...content });
+  return { ...(body as Omit<StateRecord, "hash">), hash: hashCanonical(body) };
 }
 
-export function stateHash(state: JevState): Hex {
-  return hashCanonical(state);
+/** Recompute the hash of a StateRecord from its content (everything except `hash`). */
+export function computeStateHash(state: StateRecord): Hex {
+  const { hash: _omit, ...body } = state;
+  void _omit;
+  return hashCanonical(body);
 }
 
-export function availableInputs(state: JevState): StateInput[] {
-  return state.inputs.filter((i) => i.status === "ok");
-}
-
-export function inputKeys(state: JevState): Set<string> {
-  return new Set(state.inputs.map((i) => i.key));
+export function availableInputs(state: StateRecord): StateInput[] {
+  return state.data.inputs.filter((i) => i.status === "ok");
 }
 
 /** Helper for collectors: an explicitly unavailable input. Never a placeholder value. */
 export function unavailableInput(
   key: string,
   source: StateSource,
-  observedAt: number,
+  observedAt: UnixSeconds,
   note: string,
   unit?: string,
 ): StateInput {

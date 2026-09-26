@@ -1,4 +1,6 @@
 import type { Fork, SettlementResult } from "@/lib/types/protocol";
+import type { Settlement, SettlementLine } from "@/lib/model/accountability";
+import type { AgentId, Choice, DecisionId, Probability, Wei } from "@/lib/model/primitives";
 
 /**
  * TypeScript mirror of OutcomeRegistry settlement (CONTRACT_SPEC.md §10).
@@ -6,55 +8,63 @@ import type { Fork, SettlementResult } from "@/lib/types/protocol";
  */
 
 export interface SettlementParticipant {
-  agentId: number;
-  lock: bigint;
-  submission: { choice: Fork; probability: number } | null;
-}
-
-export interface SettlementLine {
-  agentId: number;
-  result: SettlementResult;
-  lockReleased: bigint;
-  penalty: bigint;
-  reward: bigint;
+  agentId: AgentId;
+  bond: Wei;
+  submission: { choice: Choice; probability: Probability } | null;
 }
 
 export interface SettlementParams {
   slashBps: number;
   missPenaltyBps: number;
-  roundReward: bigint;
+  roundReward: Wei;
+}
+
+function line(decisionId: DecisionId, x: SettlementParticipant, result: SettlementResult, penalty: Wei): SettlementLine {
+  return { decisionId, agentId: x.agentId, bond: x.bond, settlementStatus: "SETTLED", result, reward: 0n, penalty, net: -penalty };
 }
 
 export function settle(
+  decisionId: DecisionId,
   participants: readonly SettlementParticipant[],
-  correctFork: Fork,
+  correctFork: Exclude<Fork, "ESCALATE">,
   p: SettlementParams,
-): { lines: SettlementLine[]; toRewardPool: bigint } {
-  const lines: SettlementLine[] = participants.map((x) => {
-    if (!x.submission) {
-      return { agentId: x.agentId, result: "MISSED", lockReleased: x.lock, penalty: (x.lock * BigInt(p.missPenaltyBps)) / 10_000n, reward: 0n };
-    }
-    if (x.submission.choice === "ESCALATE") {
-      return { agentId: x.agentId, result: "NEUTRAL", lockReleased: x.lock, penalty: 0n, reward: 0n };
-    }
-    if (x.submission.choice === correctFork) {
-      return { agentId: x.agentId, result: "CORRECT", lockReleased: x.lock, penalty: 0n, reward: 0n };
-    }
-    const penalty = (x.lock * BigInt(p.slashBps) * BigInt(x.submission.probability)) / 100_000_000n;
-    return { agentId: x.agentId, result: "WRONG", lockReleased: x.lock, penalty, reward: 0n };
+): Settlement {
+  const lines = participants.map((x) => {
+    if (!x.submission) return line(decisionId, x, "MISSED", (x.bond * BigInt(p.missPenaltyBps)) / 10_000n);
+    if (x.submission.choice === "ESCALATE") return line(decisionId, x, "NEUTRAL", 0n);
+    if (x.submission.choice === correctFork) return line(decisionId, x, "CORRECT", 0n);
+    return line(decisionId, x, "WRONG", (x.bond * BigInt(p.slashBps) * BigInt(x.submission.probability)) / 100_000_000n);
   });
 
   const pool = lines.reduce((t, l) => t + l.penalty, 0n) + p.roundReward;
+  const probOf = (id: AgentId) => BigInt(participants.find((x) => x.agentId === id)!.submission!.probability);
   const correct = lines.filter((l) => l.result === "CORRECT");
-  const probOf = (id: number) => BigInt(participants.find((x) => x.agentId === id)!.submission!.probability);
   const sumP = correct.reduce((t, l) => t + probOf(l.agentId), 0n);
 
   let distributed = 0n;
   if (sumP > 0n) {
     for (const l of correct) {
       l.reward = (pool * probOf(l.agentId)) / sumP;
+      l.net = l.reward;
       distributed += l.reward;
     }
   }
-  return { lines, toRewardPool: pool - distributed };
+  return { decisionId, settlementStatus: "SETTLED", lines, roundReward: p.roundReward, toRewardPool: pool - distributed, tx: null };
+}
+
+/** Cancelled or void decisions: every lock is returned in full, no rewards or penalties. */
+export function release(
+  decisionId: DecisionId,
+  participants: readonly SettlementParticipant[],
+  roundReward: Wei,
+  status: "RELEASED" | "VOID",
+): Settlement {
+  return {
+    decisionId,
+    settlementStatus: status,
+    lines: participants.map((x) => ({ decisionId, agentId: x.agentId, bond: x.bond, settlementStatus: status, result: null, reward: 0n, penalty: 0n, net: 0n })),
+    roundReward,
+    toRewardPool: roundReward,
+    tx: null,
+  };
 }

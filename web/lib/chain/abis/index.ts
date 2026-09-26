@@ -15,7 +15,7 @@ const STRUCTS = [
   "struct Agent { address operator; bytes32 nameHash; string metadataURI; bool active; uint256 bond; uint256 locked; uint32 submitted; uint32 correct; uint32 missed; }",
   "struct Aggregation { uint256[4] support; uint256 totalSupport; uint8 leading; bool thresholdPassed; uint8 approved; bool guardianRequired; uint64 guardianDeadline; uint8 submissions; }",
   "struct Execution { uint8 action; uint256 amountMoved; uint256 activeAfter; uint256 reserveAfter; int64 startPrice; int32 expo; uint64 startPublishTime; uint64 executedAt; }",
-  "struct Outcome { int64 endPrice; uint64 endPublishTime; int256 moveBps; uint8 correctFork; uint64 resolvedAt; }",
+  "struct Outcome { int64 endPrice; uint64 endPublishTime; int256 moveBps; uint8 correctFork; bool isVoid; uint64 resolvedAt; }",
   "struct SettlementLine { uint8 result; uint256 lockReleased; uint256 penalty; uint256 reward; }",
 ] as const;
 

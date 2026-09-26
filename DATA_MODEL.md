@@ -97,6 +97,7 @@ struct Outcome {                        // OutcomeRegistry
     int64   endPrice; uint64 endPublishTime;
     int256  moveBps;
     Fork    correctFork;
+    bool    isVoid;                     // no valid oracle update in the window
     uint64  resolvedAt;
 }
 
@@ -110,69 +111,148 @@ struct SettlementLine {                 // per (decisionId, agentId), emitted + 
 
 Status is ordered so the UI can render the lifecycle rail directly from `statusBlock`.
 
-## 3. Off-chain payloads (TypeScript, `web/lib/jev/types.ts`)
+## 3. Domain model (TypeScript, `web/lib/model/`)
 
-`JevState`, `StateInput`, `JevQuestion`, `QuestionSet` — see JEV_INTEGRATION.md §1–2.
+One set of types is shared by the Jev layer, the DecMarkt math, the chain read layer
+and the UI. Jev functions (`web/lib/jev/`) produce these objects; nothing else defines
+parallel shapes.
+
+### 3.1 Primitives (`primitives.ts`)
+
+`Choice`, `Score` and `Probability` are first-class, branded types. A plain number is
+not assignable to `Score` or `Probability`; values enter only through parsers that
+enforce the protocol ranges.
 
 ```ts
-type Fork = "NO_ACTION" | "DERISK" | "DEPLOY" | "ESCALATE";
-type AgentKey = "RISK" | "YIELD" | "SECURITY" | "MARKET" | "HISTORY";
+type Choice      = "NO_ACTION" | "DERISK" | "DEPLOY" | "ESCALATE";
+type Score       = number & Brand<"Score">;        // int 0..10000, computed from rubric
+type Probability = number & Brand<"Probability">;  // int 100..9900 bps
+interface JevPrimitives { choice: Choice; score: Score; probability: Probability }
+```
 
-interface FactorRating { factor: string; rating: 0 | 1 | 2 | 3 | 4; evidence: string[] /* state input keys */ }
+### 3.2 State (`state.ts`)
 
-interface JevAnswer {                // one Jev decision
-  decisionId: string;                // uint256 as decimal string
-  agentId: number;
-  questionId: number;
-  choice: Fork;
-  score: number;                     // computed, never model-provided
-  probability: number;               // bps
-  reason: string;
-  reasonHash: Hex;
-  factors: FactorRating[];
-  leaf: Hex;
-}
-
-interface AgentRun {                  // provenance of one parallel decision
-  decisionId: string;
-  agentId: number;
-  agentKey: AgentKey;
-  provider: string;                   // e.g. "anthropic"
-  model: string;                      // exact model id returned by the API
-  rubricVersion: string;
-  startedAt: number; finishedAt: number;
-  rawOutputHash: Hex;                 // keccak256 of raw model text
-  validation: { ok: true } | { ok: false; errors: string[] };
-  answers: JevAnswer[];               // empty if validation failed
-  answersRoot: Hex | null;
-  submitTx: Hex | null;               // filled after receipt, from chain
+```ts
+interface StateRecord {
+  stateId: `st_${string}`;          // from content, excluding id and hash
+  version: "decmarkt.jev.state/1";
+  source: StateSource[];            // every source that contributed, sorted
+  timestamp: UnixSeconds;
+  data: { subject: StateSubject; inputs: StateInput[] };   // inputs sorted by key
+  hash: Hex;                        // keccak256(JCS(record without hash)) = Decision.stateHash
 }
 ```
 
-Zod schema for model output (the only shape accepted from the AI):
+### 3.3 Questions (`question.ts`)
 
 ```ts
-const ModelAnswer = z.object({
-  questionId: z.number().int().min(0).max(5),
-  choice: z.enum(["NO_ACTION", "DERISK", "DEPLOY", "ESCALATE"]),
-  probability: z.number().int().min(100).max(9900),
-  factors: z.array(z.object({ factor: z.string(), rating: z.number().int().min(0).max(4), evidence: z.array(z.string()).max(8) })),
-  reason: z.string().min(20).max(600),
-}).strict();
-const ModelOutput = z.object({ answers: z.array(ModelAnswer).min(1).max(6) }).strict();
+interface Question {
+  questionId: `qn_${string}`;       // keccak(JCS{stateId, index, category, text}), standalone id
+  stateId: StateId;
+  text: string;
+  category: "ACTION" | "RISK" | "YIELD" | "SECURITY" | "MARKET" | "HISTORY";
+  createdAt: UnixSeconds;
+  index: number;                    // uint8 slot used in on-chain Merkle leaves
+  inputKeys: string[]; rubric: RubricFactor[]; allowedForks: Choice[];
+}
+interface QuestionSet { version; rubricVersion; stateId; createdAt; questions: Question[];
+                        assignment: Record<AgentKey, QuestionId[]>; hash: Hex /* = Decision.questionsHash */ }
 ```
 
-Post-validation checks: questionIds equal the agent's assignment exactly; factor names
-equal the rubric exactly; evidence keys exist in the state; choice ∈ question's
-`allowedForks`. Any failure → run marked invalid → no submission (agent is recorded as
-MISSED on-chain and settled as such).
+### 3.4 Agent decisions, parallel runs, batches (`decision.ts`)
+
+```ts
+interface AgentDecision extends JevPrimitives {
+  agentId; decisionId; questionId; questionIndex;
+  reason: string; reasonHash: Hex; factors: FactorRating[];
+  bond: Wei;                        // this agent's lock for the decision (shared by its batch)
+  timestamp: UnixSeconds;
+}
+interface DecisionBatch { batchId: `bt_${decisionId}_${agentId}`; decisionId; stateId; agentId;
+                          decisions: AgentDecision[]; answersRoot: Hex;
+                          leaves: { questionId; questionIndex; leafHash; proof }[] }
+interface AgentRun { decisionId; stateId; agentId; agentKey; provider; model; rubricVersion;
+                     startedAt; finishedAt; rawOutputHash; validation; batch; final }
+interface ParallelDecisions { decisionId; stateId; questionSetHash; runs: Record<AgentKey, AgentRun> }
+interface SubmissionRecord extends JevPrimitives { decisionId; agentId; reasonHash; answersRoot; submittedAt }
+```
+
+`ParallelDecisions.runs` is keyed by agent: exactly one independent run per agent, never
+merged. Every question an agent answers is its own `AgentDecision` and its own Merkle
+leaf, so question-level provenance survives batching and aggregation.
+
+### 3.5 Bounded forks and actions (`action.ts`)
+
+`ACTION_SPACE` is a frozen, compile-time table with one `ProtocolAction` per fork
+(contract `ExecutionVault`, entrypoint `execute`, admin-set parameters, effect).
+`ForkSpace` is the per-decision subset (always includes `NO_ACTION`).
+
+```ts
+interface Action {
+  decisionId; fork: "NO_ACTION" | "DERISK" | "DEPLOY";
+  definition: ProtocolAction;       // entry of ACTION_SPACE
+  approvedBy: "engine" | "guardian" | "fail-safe" | "guardian-timeout";
+  params: { actionBps; maxMove } | null;
+  execution: { amountMoved; after; startPrice; executedAt; tx } | null;
+  calldata?: never;                 // an Action can never carry calldata
+}
+```
+
+### 3.6 Aggregation (`aggregation.ts`)
+
+`Aggregation` keeps each agent's contribution (`inputs`: choice, score, probability,
+reputation, weight) next to the per-fork support, gates, verdict and approved fork.
+
+### 3.7 Verify / Outcome (`outcome.ts`)
+
+```ts
+interface Outcome {
+  decisionId;
+  expectedAction: "NO_ACTION" | "DERISK" | "DEPLOY";           // the executed action
+  observedResult: { start; end; moveBps; bandBps; correctFork } | null;   // null ⇔ void
+  success: boolean | null;                                     // expectedAction === correctFork
+  verificationSource: { kind: "pyth"; chainId; contract; feedId; window } | { kind: "preview" };
+  status: "VERIFIED" | "VOID";
+  timestamp: UnixSeconds;
+  tx: TxRef | null;
+}
+```
+
+### 3.8 Accountability (`accountability.ts`)
+
+```ts
+type SettlementStatus = "NOT_LOCKED" | "LOCKED" | "SETTLED" | "RELEASED" | "VOID";
+interface SettlementLine { decisionId; agentId; bond: Wei; settlementStatus;
+                           result: "CORRECT" | "WRONG" | "NEUTRAL" | "MISSED" | null;
+                           reward: Wei; penalty: Wei; net: bigint }
+interface Settlement { decisionId; settlementStatus; lines; roundReward; toRewardPool; tx }
+```
+
+### 3.9 Transactions (`transaction.ts`)
+
+`TxRef { chainId, hash, blockNumber, contract, functionName }` — the contract and
+function are decoded from the transaction's calldata, never assumed.
+`LifecycleTransition { status, blockNumber, tx }`.
+
+### 3.10 Model output (`web/lib/validation/model-output.ts`)
+
+The only shape accepted from an AI model; answers refer to questions by `questionIndex`:
+
+```ts
+{ answers: [{ questionIndex: 0..5, choice: Choice, probability: 100..9900,
+              factors: [{ factor, rating: 0..4, evidence: stateKey[] }], reason: 20..600 chars }] }
+```
+
+Post-validation: exact question coverage, exact rubric factors, evidence keys that exist
+in the state, choice inside the question's allowed forks. Any failure → run invalid → no
+submission (MISSED on-chain).
 
 ## 4. Payload store layout (content-addressed)
 
 ```
-states/{stateHash}.json              JevState (JCS bytes)
+states/{stateHash}.json              StateRecord (JCS bytes)
 questions/{questionsHash}.json       QuestionSet
-runs/{decisionId}/{agentId}.json     AgentRun (answers include reasons)
+runs/{decisionId}/{agentId}.json     AgentRun (batch includes every AgentDecision with reason)
 agents/{agentId}.json                role description + rubric (metadataURI)
 ```
 
@@ -195,3 +275,31 @@ text fields *unavailable*.
 | rewards, penalties | `OutcomeRegistry.getSettlement` |
 | agent bond, accuracy | `DecisionRegistry.getAgent` |
 | model id, latency | AgentRun payload (labelled "reported by server") |
+
+## 6. Provenance (`web/lib/model/provenance.ts`)
+
+```
+State → Question → Agent → Decision → Aggregation → Action → Transaction → Outcome → Settlement
+```
+
+`DecisionProvenance` holds every link for one decision:
+
+| Link | Field | Present from |
+|---|---|---|
+| State | `state: StateRecord \| StateRef` | chain (hash) + payload store (full) |
+| Question | `questions: QuestionSet \| QuestionSetRef` | chain (hash) + payload store (full) |
+| Agent | `agents: AgentRef[]` | registry |
+| Decision | `submissions: SubmissionRecord[]`, `parallel: ParallelDecisions` | chain / payload store |
+| Aggregation | `aggregation` | DecisionEngine |
+| Action | `action` | DecisionEngine + ExecutionVault |
+| Transaction | `decision.transitions[].tx`, `action.execution.tx` | logs + decoded transactions |
+| Outcome | `outcome` | OutcomeRegistry |
+| Settlement | `settlement` | OutcomeRegistry |
+
+- `traceDecision(p, agentId)` returns the nine steps for one agent, each marked
+  `present`, `reference-only` (hash known, payload not loaded) or `pending`.
+- `validateProvenance(p)` checks every link against its neighbours (hashes, ids,
+  participants, answersRoot vs. chain, action vs. approved fork, outcome vs. executed
+  action, settlement coverage) and returns the list of violations. The decision audit
+  page runs it on every load and shows the result.
+

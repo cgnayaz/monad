@@ -165,7 +165,7 @@ function previewSettlement(uint256 id, Fork correctFork) external view returns (
 
 If no valid update is submitted within `t0 + RESOLUTION_TOLERANCE + GRACE`, anyone may
 call `voidOutcome(id)`: all locks released, no rewards or penalties, status RESOLVED with
-`correctFork` unset and flagged `void`.
+`Outcome.isVoid = true`.
 
 ## 8. Parameters (demo defaults; admin-settable within caps)
 
