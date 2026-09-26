@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AskPanel } from "@/components/ask/ask-panel";
 import { CurrentDecision } from "@/components/decision/current-decision";
 import { QuestionsPanel, StatePanel } from "@/components/decision/panels";
 import { ReadinessPanel } from "@/components/domain/readiness-panel";
@@ -52,6 +53,10 @@ export default async function DashboardPage() {
           </div>
         }
       />
+
+      <Section title="Soru sor" description="Sistemin ne yaptığını merak ettiğiniz her şeyi sorun; yanıtları Gemini projenin kendi belgelerine dayanarak verir.">
+        <AskPanel />
+      </Section>
 
       <Section title="Güncel karar">
         <CurrentDecision chain={chain.view} chainNote={chain.note} />

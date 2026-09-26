@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AskPanel } from "@/components/ask/ask-panel";
 import { Demo } from "@/components/demo/demo";
 import { PageHeader } from "@/components/ui/layout";
 import { collectState } from "@/lib/collectors";
@@ -58,6 +59,10 @@ export default async function DemoPage() {
           </p>
         </div>
       </section>
+      <div className="mb-10">
+        <p className="mb-2.5 text-[13px] font-semibold">Soru sor</p>
+        <AskPanel />
+      </div>
       <Demo modes={r.modes} idle={idle} allowedForks={DEMO_PARAMETERS.allowedForks} />
     </>
   );
