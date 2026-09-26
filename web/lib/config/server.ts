@@ -32,21 +32,51 @@ const ServerEnv = z.object({
 
 export type ServerEnv = z.infer<typeof ServerEnv>;
 
+/** Names accepted for the Gemini key, in order of preference. */
+export const GEMINI_KEY_NAMES = ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_GEMINI_API_KEY", "GEMINI_KEY"] as const;
+
+/** A variable name as typed into a dashboard, reduced to its canonical form ("gemini api key " → GEMINI_API_KEY). */
+const canonicalName = (k: string) => k.trim().toUpperCase().replace(/[\s-]+/g, "_");
+
 /**
  * Normalise raw environment values the way they are typically pasted into a dashboard:
  * surrounding whitespace and quotes are removed, an empty value means "not configured",
- * AI_PROVIDER is case-insensitive, and GOOGLE_API_KEY stands in for GEMINI_API_KEY.
+ * names are matched case- and whitespace-insensitively, AI_PROVIDER is case-insensitive,
+ * and the usual alternative names for the Gemini key are accepted.
  */
 export function normalizeEnv(raw: Record<string, string | undefined>): Record<string, string> {
   const out: Record<string, string> = {};
+  const loose: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) {
     if (v === undefined) continue;
     const t = v.trim().replace(/^(["'])(.*)\1$/s, "$2").trim();
-    if (t !== "") out[k] = t;
+    if (t === "") continue;
+    out[k] = t;
+    loose[canonicalName(k)] ??= t;
   }
+  for (const name of [...Object.keys(ServerEnv.shape), ...GEMINI_KEY_NAMES]) if (!out[name] && loose[name]) out[name] = loose[name];
   if (out.AI_PROVIDER) out.AI_PROVIDER = out.AI_PROVIDER.toLowerCase();
-  if (!out.GEMINI_API_KEY && out.GOOGLE_API_KEY) out.GEMINI_API_KEY = out.GOOGLE_API_KEY;
+  const gemini = GEMINI_KEY_NAMES.map((n) => out[n]).find(Boolean);
+  if (gemini) out.GEMINI_API_KEY = gemini;
   return out;
+}
+
+/**
+ * What the dashboard needs to explain a missing key, by name only (never values): which
+ * deployment this is, which name the Gemini key came from, and any similarly named
+ * variables that were not recognised.
+ */
+export function envDiagnostics(raw: Record<string, string | undefined> = process.env): {
+  deployment: string | null;
+  commit: string | null;
+  geminiKeyName: string | null;
+  similarNames: string[];
+} {
+  const set = Object.entries(raw).filter(([, v]) => v !== undefined && v.trim() !== "").map(([k]) => k);
+  const geminiKeyName = set.find((k) => (GEMINI_KEY_NAMES as readonly string[]).includes(canonicalName(k))) ?? null;
+  const similarNames = set.filter((k) => /GEMINI|GOOGLE|GENAI/i.test(k) && k !== geminiKeyName);
+  const vercel = raw.VERCEL_ENV?.trim();
+  return { deployment: vercel || (raw.NODE_ENV === "production" ? "production (yerel)" : null), commit: raw.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null, geminiKeyName, similarNames };
 }
 
 /**

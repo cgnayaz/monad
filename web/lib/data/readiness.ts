@@ -1,6 +1,6 @@
 import "server-only";
 import { deployment } from "@/lib/chain/deployments";
-import { invalidEnvVars, serverEnv } from "@/lib/config/server";
+import { envDiagnostics, invalidEnvVars, serverEnv } from "@/lib/config/server";
 import { providerStatus } from "@/lib/ai";
 import { AGENTS } from "@/lib/jev/agents";
 import { sessionsConfigured } from "@/lib/server/operator-session";
@@ -16,6 +16,8 @@ export interface Readiness {
   signers: { ok: boolean; detail: string };
   /** Variables that are set but malformed and therefore ignored (names only). */
   invalidEnv: string[];
+  /** Deployment and key-name diagnostics (names only, never values). */
+  env: ReturnType<typeof envDiagnostics>;
   ready: boolean;
   /** What a round can do right now. */
   mode: "live" | "simulation" | "unavailable";
@@ -62,5 +64,5 @@ export function readiness(): Readiness {
           : { ok: true, reason: r.oracle.ok ? "Her aşama bir Monad Testnet işlemidir. Operatör girişi gerekir." : "Onaya kadar çalışır; yürütme imzalı fiyat için PYTH_API_KEY gerektirir." };
   const mode = live.ok ? "live" : simulation.ok ? "simulation" : "unavailable";
   const modeDetail = mode === "live" ? live.reason : mode === "simulation" ? simulation.reason : "Hiçbir AI sağlayıcı yapılandırılmadığı için hiçbir ajan değerlendirme yapamaz. Hiçbir şey simüle edilmez.";
-  return { ...r, invalidEnv: invalidEnvVars(), ready, mode, modeDetail, modes: { simulation, live } };
+  return { ...r, invalidEnv: invalidEnvVars(), env: envDiagnostics(), ready, mode, modeDetail, modes: { simulation, live } };
 }

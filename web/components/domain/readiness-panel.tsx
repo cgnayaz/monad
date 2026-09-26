@@ -23,6 +23,29 @@ export function ReadinessPanel({ r }: { r: Readiness }) {
           </li>
         ))}
       </ul>
+      {!r.ai.ok && r.env.similarNames.length > 0 && (
+        <p className="border-t border-rule px-4 py-2.5 text-[12.5px] text-fail">
+          Tanınmayan benzer değişken adları: <span className="font-mono">{r.env.similarNames.join(", ")}</span> — adı tam olarak{" "}
+          <span className="font-mono">GEMINI_API_KEY</span> olmalı.
+        </p>
+      )}
+      {!r.ai.ok && r.env.deployment && (
+        <p className="border-t border-rule px-4 py-2.5 text-[12.5px] text-ink-2">
+          Bu sayfa <span className="font-mono">{r.env.deployment}</span> ortamından sunuluyor
+          {r.env.commit && (
+            <>
+              {" "}
+              (commit <span className="font-mono">{r.env.commit}</span>)
+            </>
+          )}
+          . Anahtar bu ortam için eklenmeli; ekledikten sonra yeniden deploy gerekir.
+        </p>
+      )}
+      {r.ai.ok && r.env.geminiKeyName && r.env.geminiKeyName !== "GEMINI_API_KEY" && (
+        <p className="border-t border-rule px-4 py-2.5 text-[12.5px] text-ink-2">
+          Gemini anahtarı <span className="font-mono">{r.env.geminiKeyName}</span> adından okundu.
+        </p>
+      )}
       {r.invalidEnv.length > 0 && (
         <p className="border-t border-rule px-4 py-2.5 text-[12.5px] text-fail">
           Geçersiz biçimli olduğu için yok sayılan değişkenler: <span className="font-mono">{r.invalidEnv.join(", ")}</span>
