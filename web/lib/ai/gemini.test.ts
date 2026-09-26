@@ -76,4 +76,12 @@ describe("GeminiProvider", () => {
     expect(supportsThinkingLevel("models/gemini-3.7-flash")).toBe(true);
     expect(supportsThinkingLevel("gemini-2.5-flash")).toBe(false);
   });
+
+  it("explains depleted prepay credits (HTTP 402) without retrying", async () => {
+    script.responses.push(() => {
+      throw new ApiError({ message: "Your prepayment credits are depleted", status: 402 });
+    });
+    await expect(new GeminiProvider("k", "m1", ["m2"]).evaluate(req, new AbortController().signal)).rejects.toMatchObject({ message: expect.stringContaining("kredisi bitti") });
+    expect(script.calls).toEqual(["m1"]);
+  });
 });
