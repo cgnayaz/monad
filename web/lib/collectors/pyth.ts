@@ -36,15 +36,38 @@ async function fetchPrice(path: string): Promise<PythSnapshot> {
   if (!env.PYTH_API_KEY) throw new Error("PYTH_API_KEY is not configured");
   const id = PYTH.feedId;
   const url = `${env.PYTH_HERMES_URL}${path}?ids%5B%5D=${id}&parsed=true`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${env.PYTH_API_KEY}` },
-    signal: AbortSignal.timeout(6_000),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`Hermes responded ${res.status}`);
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    res = await fetch(url, {
+      headers: { Authorization: `Bearer ${env.PYTH_API_KEY}` },
+      signal: AbortSignal.timeout(6_000),
+      cache: "no-store",
+    });
+    if (res.ok || !(res.status === 429 || res.status >= 500)) break;
+    await new Promise((r) => setTimeout(r, 500 + Math.random() * 500)); // one retry on rate limit / upstream error
+  }
+  if (!res || !res.ok) throw new Error(`Hermes responded ${res?.status ?? "no response"}`);
   const body = HermesResponse.parse(await res.json());
   const first = body.parsed[0];
   return { price: first.price, ema: first.ema_price };
+}
+
+/**
+ * A published price never changes, so historical lookups are cached in memory (bounded).
+ * Lookback times are aligned to 10 s so page loads within the same window share requests;
+ * the exact publish time used is still recorded with each input.
+ */
+const history = new Map<number, Promise<PythSnapshot>>();
+function historicalPrice(timestamp: number): Promise<PythSnapshot> {
+  const t = timestamp - (timestamp % 10);
+  let p = history.get(t);
+  if (!p) {
+    p = fetchPrice(`/v2/updates/price/${t}`);
+    p.catch(() => history.delete(t)); // failures are not cached
+    if (history.size >= 500) history.delete(history.keys().next().value!);
+    history.set(t, p);
+  }
+  return p;
 }
 
 export async function collectPythInputs(now: number): Promise<StateInput[]> {
@@ -86,7 +109,7 @@ export async function collectPythInputs(now: number): Promise<StateInput[]> {
   ];
 
   const past = await Promise.allSettled(
-    historyWindows.map((w) => fetchPrice(`/v2/updates/price/${latest.price.publish_time - w.seconds}`)),
+    historyWindows.map((w) => historicalPrice(latest.price.publish_time - w.seconds)),
   );
   historyWindows.forEach((w, i) => {
     const r = past[i];

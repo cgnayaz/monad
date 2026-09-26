@@ -7,7 +7,7 @@ one page. Target: about two minutes of narration plus the 60 s horizon.
 
 | | Simulation mode | Live testnet mode |
 |---|---|---|
-| Needs | `ANTHROPIC_API_KEY` (+ `PYTH_API_KEY` for verify) | the above + deployed contracts + proposer, keeper and 5 agent keys |
+| Needs | an AI provider key (`GEMINI_API_KEY`, or `ANTHROPIC_API_KEY`) (+ `PYTH_API_KEY` for verify) | the above + deployed contracts + proposer, keeper and 5 agent keys |
 | State, questions, agents, aggregation | real, identical | real, identical; state hash committed on-chain **before** agents run |
 | Action | applied to a local model of the vault; no funds, no transaction | `ExecutionVault.execute` approved in the judge's wallet (or by the keeper) |
 | Monad step | explicitly shows "no transactions" | every transaction with pending → confirmed state and explorer links |

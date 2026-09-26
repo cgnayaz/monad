@@ -1,6 +1,7 @@
 import "server-only";
 import { deployment } from "@/lib/chain/deployments";
 import { serverEnv } from "@/lib/config/server";
+import { providerStatus } from "@/lib/ai";
 import { AGENTS } from "@/lib/jev/agents";
 import { sessionsConfigured } from "@/lib/server/operator-session";
 
@@ -26,6 +27,7 @@ export interface Readiness {
 export function readiness(): Readiness {
   const env = serverEnv();
   const d = deployment();
+  const ai = providerStatus();
   const agentKeys = AGENTS.filter((a) => !!env[a.operatorKeyEnv]).length;
   const signersOk = agentKeys === AGENTS.length && !!env.PROPOSER_PRIVATE_KEY && !!env.KEEPER_PRIVATE_KEY;
 
@@ -33,9 +35,9 @@ export function readiness(): Readiness {
     contracts: d.deployed
       ? { ok: true, detail: "All four contracts deployed" }
       : { ok: false, detail: `Not deployed: ${d.missing.join(", ")}` },
-    ai: env.ANTHROPIC_API_KEY
-      ? { ok: true, detail: `Provider configured (${env.AI_MODEL})` }
-      : { ok: false, detail: "ANTHROPIC_API_KEY not configured" },
+    ai: ai.configured
+      ? { ok: true, detail: `Provider configured (${ai.provider} · ${ai.model})` }
+      : { ok: false, detail: ai.reason ?? "AI provider not configured" },
     oracle: env.PYTH_API_KEY
       ? { ok: true, detail: "Pyth Hermes key configured" }
       : { ok: false, detail: "PYTH_API_KEY not configured (required by Hermes since 2026-08-26)" },

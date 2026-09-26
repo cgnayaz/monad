@@ -7,7 +7,7 @@ import { listAgents } from "@/lib/data/agents";
 import { payloadStore } from "@/lib/store/payload-store";
 import { latestPriceUpdate, priceUpdateAt } from "@/lib/collectors/pyth";
 import { serverEnv } from "@/lib/config/server";
-import { DEFAULT_PARAMS } from "@/lib/decmarkt/params";
+import { DEFAULT_PARAMS, ROUND_TIMING } from "@/lib/decmarkt/params";
 import { AGENTS } from "@/lib/jev/agents";
 import type { DecisionParameters } from "@/lib/model/final-decision";
 import { FORKS, type AgentKey, type Hex } from "@/lib/types/protocol";
@@ -31,12 +31,12 @@ export const DECISION_PARAMETERS: DecisionParameters = {
   lockPerAgent: DEFAULT_PARAMS.lockPerAgent,
 };
 
-/**
- * Parameters for the judge-facing demo: a 90 s submission window and a 60 s horizon so a
- * full round — including the verified outcome — fits in a few minutes. The mechanism is
- * identical; only the time scale differs (and is shown in the UI).
- */
-export const DEMO_PARAMETERS: DecisionParameters = { ...DECISION_PARAMETERS, submissionWindow: 90, horizon: 60 };
+/** Parameters rounds run with: the defaults at the demo time scale (ROUND_TIMING). */
+export const DEMO_PARAMETERS: DecisionParameters = {
+  ...DECISION_PARAMETERS,
+  submissionWindow: ROUND_TIMING.submissionWindowSec,
+  horizon: ROUND_TIMING.horizonSec,
+};
 
 export function chainExecutionLayer(): { layer: ChainExecutionLayer } | { layer: null; reason: string } {
   const d = deployment();

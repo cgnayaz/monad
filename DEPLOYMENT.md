@@ -78,8 +78,10 @@ Environment variables — the full annotated list is [web/.env.example](web/.env
 | Variable | Kind | Needed for |
 |---|---|---|
 | `NEXT_PUBLIC_MONAD_RPC_URL` | public (optional) | browser + server RPC; default `https://testnet-rpc.monad.xyz` |
-| `ANTHROPIC_API_KEY` | secret | every round (simulation and live); the account needs credit |
-| `AI_MODEL` | config (optional) | default `claude-opus-5` |
+| `AI_PROVIDER` | config (optional) | `gemini` or `anthropic`; default `gemini` when `GEMINI_API_KEY` is set |
+| `GEMINI_API_KEY` | secret | every round (simulation and live) with the Gemini provider |
+| `AI_MODEL`, `AI_FALLBACK_MODEL` | config (optional) | Gemini defaults `gemini-3.8-flash`, fallbacks `gemini-3.7-flash,gemini-3.6-flash` |
+| `ANTHROPIC_API_KEY` | secret (optional) | only with `AI_PROVIDER=anthropic` (default model `claude-opus-5`); the account needs credit |
 | `PYTH_API_KEY`, `PYTH_HERMES_URL` | secret / config | signed prices (execute, resolve, verification); key entitled to ETH/USD |
 | `SESSION_SECRET` | secret, ≥ 32 chars | operator sign-in; live mode is off without it |
 | `PROPOSER_PRIVATE_KEY`, `KEEPER_PRIVATE_KEY`, `AGENT_{RISK,YIELD,SECURITY,MARKET,HISTORY}_PRIVATE_KEY` | secret | live mode; must match the addresses in contracts/DEPLOYMENTS.md |

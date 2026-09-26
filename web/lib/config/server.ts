@@ -10,8 +10,14 @@ import { z } from "zod";
 const privateKey = z.string().regex(/^0x[0-9a-fA-F]{64}$/, "expected 0x-prefixed 32-byte hex");
 
 const ServerEnv = z.object({
+  /** Which provider runs the agents. Default: gemini when GEMINI_API_KEY is set, else anthropic. */
+  AI_PROVIDER: z.enum(["gemini", "anthropic"]).optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  AI_MODEL: z.string().min(1).default("claude-opus-5"),
+  /** Model id; default depends on the provider (see lib/ai/index.ts). */
+  AI_MODEL: z.string().min(1).optional(),
+  /** Gemini only: comma-separated models tried when the primary is overloaded or out of quota. */
+  AI_FALLBACK_MODEL: z.string().min(1).optional(),
   PYTH_HERMES_URL: z.string().url().default("https://pyth.dourolabs.app/hermes"),
   PYTH_API_KEY: z.string().min(1).optional(),
   PROPOSER_PRIVATE_KEY: privateKey.optional(),

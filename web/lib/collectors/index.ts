@@ -1,7 +1,7 @@
 import "server-only";
 import { contractAddress } from "@/lib/chain/deployments";
 import { PYTH } from "@/lib/config/public";
-import { DEFAULT_PARAMS } from "@/lib/decmarkt/params";
+import { DEFAULT_PARAMS, ROUND_TIMING } from "@/lib/decmarkt/params";
 import { buildState, type StateRecord } from "@/lib/jev/state";
 import { collectNetworkInputs } from "./network";
 import { collectProtocolInputs } from "./protocol";
@@ -19,7 +19,7 @@ export async function collectState(): Promise<StateRecord> {
       vault: contractAddress("ExecutionVault"),
       asset: "MON",
       referenceFeed: PYTH.feedSymbol,
-      horizonSec: DEFAULT_PARAMS.horizonSec,
+      horizonSec: ROUND_TIMING.horizonSec, // the horizon rounds run with, as committed on chain
       bandBps: DEFAULT_PARAMS.bandBps,
     },
     groups.flat(),

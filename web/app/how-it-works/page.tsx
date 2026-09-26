@@ -134,7 +134,7 @@ export default function HowItWorksPage() {
         </Table>
       </Section>
 
-      <Section title="Guarantees">
+      <Section title="Enforced in code" description="Each property follows from a specific check in the contracts or the server, not from model behaviour.">
         <dl className="grid grid-cols-1 border border-rule bg-surface md:grid-cols-2">
           {GUARANTEES.map(([g, why], i) => (
             <div key={g} className={`border-rule px-5 py-4 ${i % 2 === 0 ? "md:border-r" : ""} ${i > 0 ? "border-t" : ""} ${i === 1 ? "md:border-t-0" : ""}`}>

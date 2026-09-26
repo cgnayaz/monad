@@ -22,6 +22,7 @@ import {
 } from "./step-content";
 import { OperatorSessionBar, useOperatorSession } from "@/components/wallet/operator-session";
 import { STEPS, useDemo, type DemoMode, type StepKey, type StepStatus } from "./use-demo";
+import { ROUND_TIMING } from "@/lib/decmarkt/params";
 
 interface ModeAvailability {
   ok: boolean;
@@ -121,7 +122,7 @@ export function Demo({ modes, idle, allowedForks }: { modes: Record<DemoMode, Mo
               Retry {STEP_COPY[failed].title.toLowerCase()}
             </Button>
           )}
-          <span className="text-[12.5px] text-ink-2">Demo time scale: 90 s submission window, 60 s horizon. Same rules, shorter clock.</span>
+          <span className="text-[12.5px] text-ink-2">Demo time scale: {ROUND_TIMING.submissionWindowSec} s submission window, {ROUND_TIMING.horizonSec} s horizon. Same rules, shorter clock.</span>
         </div>
       </div>
 
