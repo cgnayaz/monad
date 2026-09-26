@@ -1,3 +1,4 @@
+import { agentName, questionText, rubricText } from "@/lib/i18n";
 import { AGENTS } from "@/lib/jev/agents";
 import type { QuestionSet } from "@/lib/jev/questions";
 
@@ -15,19 +16,19 @@ export function QuestionList({ set }: { set: QuestionSet }) {
               <span className="text-[11px] font-medium tracking-[0.06em] text-ink-2">{q.category}</span>
             </div>
             <div>
-              <p className="text-[14px] leading-[22px]">{q.text}</p>
+              <p className="text-[14px] leading-[22px]">{questionText(q.category, q.text)}</p>
               <p className="mt-2 font-mono text-[11.5px] text-ink-3" title={`stateId ${q.stateId}`}>{q.questionId}</p>
               <p className="mt-1 text-[12px] text-ink-2">
-                Answered by {answeredBy.length === AGENTS.length ? "all five agents" : answeredBy.map((a) => a.name).join(", ")}
+                Yanıtlayan: {answeredBy.length === AGENTS.length ? "beş ajanın tümü" : answeredBy.map((a) => agentName(a.key, a.name)).join(", ")}
               </p>
             </div>
             <details className="text-[12px] text-ink-2">
-              <summary className="cursor-pointer select-none text-ink">Rubric · {q.rubric.length} factors</summary>
+              <summary className="cursor-pointer select-none text-ink">Rubrik · {q.rubric.length} faktör</summary>
               <ul className="mt-2 space-y-1.5">
                 {q.rubric.map((f) => (
                   <li key={f.factor} className="grid grid-cols-[1fr_auto] gap-2">
                     <span>
-                      <span className="font-mono text-ink">{f.factor}</span> — {f.description}
+                      <span className="font-mono text-ink">{f.factor}</span> — {rubricText(f.factor, f.description)}
                     </span>
                     <span className="font-mono tabular text-ink-3">
                       {f.weight}/{totalWeight}

@@ -13,7 +13,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata(props: PageProps<"/docs/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
-  return { title: DOCS.find((d) => d.slug === slug)?.title ?? "Documentation" };
+  return { title: DOCS.find((d) => d.slug === slug)?.title ?? "Belgeler" };
 }
 
 export default async function DocPage(props: PageProps<"/docs/[slug]">) {
@@ -23,8 +23,8 @@ export default async function DocPage(props: PageProps<"/docs/[slug]">) {
 
   return (
     <div className="grid grid-cols-1 gap-10 lg:grid-cols-[200px_minmax(0,1fr)]">
-      <nav aria-label="Documents" className="text-[13px] lg:sticky lg:top-8 lg:self-start">
-        <p className="label mb-3">Documents</p>
+      <nav aria-label="Belgeler" className="text-[13px] lg:sticky lg:top-8 lg:self-start">
+        <p className="label mb-3">Belgeler</p>
         <ul className="space-y-1.5">
           {DOCS.map((d) => (
             <li key={d.slug}>

@@ -7,24 +7,24 @@ import "./globals.css";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600"],
 });
 
 const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
   title: { default: "DecMarkt", template: "%s · DecMarkt" },
-  description: "AI decisions with on-chain accountability. Jev-structured decisions, bonded agents, settled on Monad.",
+  description: "Zincir üstünde hesap verebilir AI kararları. Jev ile yapılandırılmış kararlar, teminatlı ajanlar, Monad üzerinde uzlaşma.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
+    <html lang="tr" className={`${plexSans.variable} ${plexMono.variable}`}>
       <body className="flex min-h-dvh flex-col">
         <Providers>
           <SiteHeader />

@@ -31,7 +31,7 @@ export function StatusMark({ tone, children, live = false }: { tone: Tone; child
 export function Unavailable({ reason }: { reason: string }) {
   return (
     <span className="cursor-help text-ink-3" title={reason}>
-      —<span className="sr-only"> unavailable: {reason}</span>
+      —<span className="sr-only"> kullanılamıyor: {reason}</span>
     </span>
   );
 }

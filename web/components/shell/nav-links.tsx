@@ -5,18 +5,18 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/demo", label: "Demo" },
-  { href: "/decisions", label: "Decisions" },
-  { href: "/agents", label: "Agents" },
-  { href: "/contracts", label: "Contracts" },
-  { href: "/how-it-works", label: "How it works" },
-  { href: "/docs", label: "Docs" },
+  { href: "/decisions", label: "Kararlar" },
+  { href: "/agents", label: "Ajanlar" },
+  { href: "/contracts", label: "Kontratlar" },
+  { href: "/how-it-works", label: "Nasıl çalışır" },
+  { href: "/docs", label: "Belgeler" },
 ] as const;
 
 export function NavLinks({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
   return (
     <nav
-      aria-label="Primary"
+      aria-label="Ana menü"
       className={
         mobile
           ? "flex gap-5 overflow-x-auto px-4 py-2 text-[13px] [scrollbar-width:none]"

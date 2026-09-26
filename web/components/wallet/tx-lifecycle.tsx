@@ -6,21 +6,21 @@ import type { TxErrorKind } from "@/lib/chain/tx-errors";
 import type { TxPhase, TxState } from "./use-wallet-tx";
 
 const PHASES: { key: Exclude<TxPhase, "idle" | "failed">; label: string }[] = [
-  { key: "preparing", label: "Preparing" },
-  { key: "awaiting-approval", label: "Awaiting approval" },
-  { key: "submitted", label: "Submitted" },
-  { key: "confirming", label: "Confirming" },
-  { key: "confirmed", label: "Confirmed" },
+  { key: "preparing", label: "Hazırlanıyor" },
+  { key: "awaiting-approval", label: "Onay bekleniyor" },
+  { key: "submitted", label: "Gönderildi" },
+  { key: "confirming", label: "Onaylanıyor" },
+  { key: "confirmed", label: "Onaylandı" },
 ];
 
 const ERROR_LABEL: Record<TxErrorKind, string> = {
-  "no-wallet": "No wallet",
-  rejected: "Rejected",
-  "wrong-network": "Wrong network",
-  "insufficient-balance": "Insufficient balance",
+  "no-wallet": "Cüzdan yok",
+  rejected: "Reddedildi",
+  "wrong-network": "Yanlış ağ",
+  "insufficient-balance": "Yetersiz bakiye",
   rpc: "RPC failure",
-  revert: "Contract revert",
-  unknown: "Error",
+  revert: "Kontrat revert",
+  unknown: "Hata",
 };
 
 /** The real lifecycle of one wallet transaction, with its hash, explorer link and receipt. */
@@ -35,7 +35,7 @@ export function TxLifecycle({ state }: { state: TxState }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule px-4 py-2.5">
         <span className="font-mono text-[12.5px]">{state.label}</span>
         {failed ? (
-          <StatusMark tone="fail">{state.error ? ERROR_LABEL[state.error.kind] : "failed"}</StatusMark>
+          <StatusMark tone="fail">{state.error ? ERROR_LABEL[state.error.kind] : "başarısız"}</StatusMark>
         ) : (
           <StatusMark tone={state.phase === "confirmed" ? "pass" : "wait"} live={state.phase !== "confirmed"}>
             {PHASES[reached]?.label ?? state.phase}
@@ -61,7 +61,7 @@ export function TxLifecycle({ state }: { state: TxState }) {
         {state.note && !failed && <p className="text-ink-2">{state.note}</p>}
         {state.hash && (
           <div className="flex flex-wrap gap-x-2">
-            <dt className="text-ink-3">Transaction</dt>
+            <dt className="text-ink-3">İşlem</dt>
             <dd>
               <a href={explorer.tx(state.hash)} target="_blank" rel="noreferrer" className="break-all font-mono underline decoration-rule underline-offset-2 hover:decoration-ink">
                 {state.hash}
@@ -77,7 +77,7 @@ export function TxLifecycle({ state }: { state: TxState }) {
                 {state.receipt.blockNumber}
               </a>
             </span>
-            <span>gas used {Number(state.receipt.gasUsed).toLocaleString("en-US")}</span>
+            <span>kullanılan gas {Number(state.receipt.gasUsed).toLocaleString("en-US")}</span>
             <span>status {state.receipt.status}</span>
           </div>
         )}

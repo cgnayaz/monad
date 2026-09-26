@@ -35,8 +35,8 @@ export function Hash({ value, href, full = false }: { value: string; href?: stri
           {text}
         </span>
       )}
-      <button type="button" onClick={copy} className="text-[11px] text-ink-3 hover:text-ink" aria-label={`Copy ${value}`}>
-        {copied ? "copied" : "copy"}
+      <button type="button" onClick={copy} className="text-[11px] text-ink-3 hover:text-ink" aria-label={`Kopyala: ${value}`}>
+        {copied ? "kopyalandı" : "kopyala"}
       </button>
     </span>
   );

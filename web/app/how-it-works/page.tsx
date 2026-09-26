@@ -6,83 +6,83 @@ import { Pipeline } from "@/components/domain/pipeline";
 import { PageHeader, Section } from "@/components/ui/layout";
 import { Table, Td, Th } from "@/components/ui/table";
 
-export const metadata: Metadata = { title: "How it works" };
+export const metadata: Metadata = { title: "Nasıl çalışır" };
 
 const LAYERS = [
   {
     n: "1",
     name: "Jev",
-    role: "structures the decision",
-    does: "Turns the world into a hashed state, asks explicit questions about it, and has five independent analysts answer each question with a choice from a closed set, rubric ratings that produce a score, a probability and a reason.",
-    produces: "State · Questions · Choice · Score · Probability",
+    role: "kararı yapılandırır",
+    does: "Dünyayı hash'lenmiş bir duruma dönüştürür, bu durum hakkında açık sorular sorar ve beş bağımsız analistin her soruyu kapalı bir kümeden bir seçim, skor üreten rubrik puanları, bir olasılık ve bir gerekçeyle yanıtlamasını sağlar.",
+    produces: "Durum · Sorular · Seçim · Skor · Olasılık",
     code: "web/lib/jev",
   },
   {
     n: "2",
     name: "DecMarkt",
-    role: "adds accountability",
-    does: "Gives every analyst an on-chain identity and a bond, aggregates their decisions with fixed integer rules, applies the threshold, selects one bounded action, and settles every bond against the verified outcome.",
-    produces: "Aggregate · Threshold · Action · Reward / penalty",
+    role: "hesap verebilirlik ekler",
+    does: "Her analiste zincir üstü bir kimlik ve teminat verir, kararlarını sabit tamsayı kurallarıyla toplar, eşiği uygular, tek bir sınırlı eylem seçer ve her teminatı doğrulanmış sonuca göre uzlaştırır.",
+    produces: "Toplama · Eşik · Eylem · Ödül / ceza",
     code: "web/lib/decmarkt, DecisionEngine, OutcomeRegistry",
   },
   {
     n: "3",
     name: "Monad",
-    role: "enforces and records the result",
-    does: "Holds the lifecycle, the submissions, the bonds and the treasury in contracts. Only the approved action can execute; the outcome is taken from a signed Pyth price inside a strict window; every step is a public transaction.",
-    produces: "Transactions · Execution · Verified outcome · Settlement",
+    role: "sonucu uygular ve kaydeder",
+    does: "Yaşam döngüsünü, gönderimleri, teminatları ve hazineyi kontratlarda tutar. Yalnızca onaylanan eylem yürütülebilir; sonuç katı bir pencere içindeki imzalı Pyth fiyatından alınır; her adım herkese açık bir işlemdir.",
+    produces: "İşlemler · Yürütme · Doğrulanmış sonuç · Uzlaşma",
     code: "contracts/src",
   },
 ];
 
 const JEV_MAP: [string, string, string][] = [
-  ["State", "Canonical JSON of sourced inputs, hashed and committed before agents run", "Decision.stateHash"],
-  ["Questions", "Six explicit questions, each with its own id and the inputs it evaluates", "Decision.questionSetHash"],
-  ["Choice", "One of four bounded forks, validated as a closed enum", "Submission.choice"],
-  ["Score", "Computed from 0–4 rubric ratings by a fixed formula (0–10000)", "Submission.score"],
-  ["Probability", "Confidence in basis points (1–99 %); weights the vote and the settlement", "Submission.probability"],
-  ["Parallel decisions", "Five isolated runs, each from its own operator address", "5 × submitBatch"],
-  ["Batch decisions", "All answers of an agent in one transaction, one record per question", "Submission per (agent, question)"],
-  ["Bounded forks", "Fixed enum plus a per-decision mask; one code path per fork in the vault", "DecisionConfig.allowedForks"],
-  ["Action", "Only the fork approved by the engine (or a guardian) executes", "ExecutionVault.execute"],
-  ["Verify", "Signed oracle price inside a strict window; hashes recomputed on read", "OutcomeRegistry.resolve"],
+  ["Durum (State)", "Kaynaklı girdilerin kanonik JSON'u; ajanlar çalışmadan önce hash'lenir ve zincire işlenir", "Decision.stateHash"],
+  ["Sorular (Questions)", "Her birinin kendi kimliği ve değerlendirdiği girdileri olan altı açık soru", "Decision.questionSetHash"],
+  ["Seçim (Choice)", "Dört sınırlı çataldan biri; kapalı enum olarak doğrulanır", "Submission.choice"],
+  ["Skor (Score)", "0–4 rubrik puanlarından sabit bir formülle hesaplanır (0–10000)", "Submission.score"],
+  ["Olasılık (Probability)", "Baz puan cinsinden güven (%1–99); oyu ve uzlaşmayı ağırlıklandırır", "Submission.probability"],
+  ["Paralel kararlar", "Her biri kendi operatör adresinden beş yalıtılmış çalıştırma", "5 × submitBatch"],
+  ["Toplu kararlar", "Bir ajanın tüm yanıtları tek işlemde, soru başına bir kayıt", "(ajan, soru) başına Submission"],
+  ["Sınırlı çatallar", "Sabit enum artı karar başına maske; kasada çatal başına tek kod yolu", "DecisionConfig.allowedForks"],
+  ["Eylem (Action)", "Yalnızca motorun (veya bir guardian'ın) onayladığı çatal yürütülür", "ExecutionVault.execute"],
+  ["Doğrulama (Verify)", "Katı bir pencere içinde imzalı oracle fiyatı; hash'ler okunurken yeniden hesaplanır", "OutcomeRegistry.resolve"],
 ];
 
 const GUARANTEES = [
-  ["No arbitrary action", "Choices are validated against a closed enum and the decision's fork mask, in the server and in the contract."],
-  ["No keys or calldata for the AI", "Keys stay in the execution layer; every call targets a fixed function with arguments built from validated fields."],
-  ["No model decides the outcome", "Aggregation and threshold are integer rules; the contract's result is compared with the local one before anything executes."],
-  ["No self-settlement", "Rewards and penalties follow from the oracle outcome by fixed rules in OutcomeRegistry."],
-  ["Disagreement never moves funds", "Any failed gate — quorum, share or score — approves NO_ACTION."],
-  ["Failures are visible", "Timeouts, provider errors, invalid JSON and schema violations are recorded per agent and settled as missed."],
+  ["Keyfi eylem yok", "Seçimler hem sunucuda hem kontratta kapalı bir enum'a ve kararın çatal maskesine göre doğrulanır."],
+  ["AI'ya anahtar veya calldata yok", "Anahtarlar yürütme katmanında kalır; her çağrı, doğrulanmış alanlardan kurulan argümanlarla sabit bir fonksiyonu hedefler."],
+  ["Sonuca hiçbir model karar vermez", "Toplama ve eşik tamsayı kurallarıdır; bir şey yürütülmeden önce kontratın sonucu yerel sonuçla karşılaştırılır."],
+  ["Kendi kendine uzlaşma yok", "Ödüller ve cezalar, OutcomeRegistry'deki sabit kurallarla oracle sonucundan çıkar."],
+  ["Anlaşmazlık fon taşımaz", "Başarısız herhangi bir kapı — yeter sayı, pay veya skor — NO_ACTION'ı onaylar."],
+  ["Hatalar görünür", "Zaman aşımları, sağlayıcı hataları, geçersiz JSON ve şema ihlalleri ajan başına kaydedilir ve kaçırılmış olarak uzlaştırılır."],
 ];
 
 export default function HowItWorksPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Protocol"
-        title="How DecMarkt works"
-        lead="Jev structures the decision. DecMarkt adds accountability. Monad enforces and records the result."
+        eyebrow="Protokol"
+        title="DecMarkt nasıl çalışır"
+        lead="Jev kararı yapılandırır. DecMarkt hesap verebilirlik ekler. Monad sonucu uygular ve kaydeder."
       />
 
-      <Section title="Three layers">
+      <Section title="Üç katman">
         <ol className="border border-rule bg-surface">
           {LAYERS.map((l) => (
             <li key={l.name} className="grid grid-cols-1 gap-x-8 gap-y-2 border-b border-rule px-5 py-5 last:border-b-0 md:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_280px]">
               <div>
-                <p className="font-mono text-[11px] text-ink-3">layer {l.n}</p>
+                <p className="font-mono text-[11px] text-ink-3">katman {l.n}</p>
                 <p className="text-[17px] font-medium">{l.name}</p>
                 <p className="text-[13px] text-accent">{l.role}</p>
               </div>
               <p className="text-[13.5px] leading-[21px] text-ink-2">{l.does}</p>
               <dl className="space-y-2 text-[12.5px] md:col-start-2 xl:col-start-auto">
                 <div>
-                  <dt className="label">Produces</dt>
+                  <dt className="label">Ürettiği</dt>
                   <dd className="mt-0.5">{l.produces}</dd>
                 </div>
                 <div>
-                  <dt className="label">Where</dt>
+                  <dt className="label">Nerede</dt>
                   <dd className="mt-0.5 font-mono text-[12px] text-ink-2">{l.code}</dd>
                 </div>
               </dl>
@@ -91,35 +91,35 @@ export default function HowItWorksPage() {
         </ol>
       </Section>
 
-      <Section title="From state to settlement" description="Every stage names the layer and the component responsible. The dashboard and the decision records show these stages with real values.">
+      <Section title="Durumdan uzlaşmaya" description="Her aşama sorumlu katmanı ve bileşeni belirtir. Ana sayfa ve karar kayıtları bu aşamaları gerçek değerlerle gösterir.">
         <Pipeline />
       </Section>
 
       <Section
-        title="What is being decided"
-        description="An on-chain vault holds test MON in two buckets, ACTIVE and RESERVE. Each round decides whether to move part of it for the next horizon. The correct answer is defined by the reference-market move (ETH/USD) measured from signed Pyth prices — never by opinion."
+        title="Neye karar veriliyor"
+        description="Zincir üstü bir kasa test MON'unu iki kovada tutar: ACTIVE ve RESERVE. Her tur, bir sonraki ufuk için bunun bir kısmının taşınıp taşınmayacağına karar verir. Doğru cevabı imzalı Pyth fiyatlarından ölçülen referans piyasa hareketi (ETH/USD) belirler — asla bir görüş değil."
       >
         <ForkTable />
       </Section>
 
-      <Section title="Lifecycle" description="Enforced by DecisionRegistry. Invalid transitions revert; each reached state records its block and transaction.">
+      <Section title="Yaşam döngüsü" description="DecisionRegistry tarafından uygulanır. Geçersiz geçişler revert eder; ulaşılan her durum kendi bloğunu ve işlemini kaydeder.">
         <LifecycleRail />
       </Section>
 
       <Section
-        title="Jev in the implementation"
+        title="Uygulamada Jev"
         aside={
           <Link href="/docs/jev-integration" className="text-[13px] text-ink-2 hover:text-ink">
-            Full mapping →
+            Tam eşleme →
           </Link>
         }
       >
-        <Table caption="Jev mapping">
+        <Table caption="Jev eşlemesi">
           <thead>
             <tr>
-              <Th>Jev concept</Th>
-              <Th>Implementation</Th>
-              <Th>On-chain anchor</Th>
+              <Th>Jev kavramı</Th>
+              <Th>Uygulama</Th>
+              <Th>Zincir üstü karşılığı</Th>
             </tr>
           </thead>
           <tbody>
@@ -134,7 +134,7 @@ export default function HowItWorksPage() {
         </Table>
       </Section>
 
-      <Section title="Enforced in code" description="Each property follows from a specific check in the contracts or the server, not from model behaviour.">
+      <Section title="Kodla garanti altında" description="Her özellik model davranışından değil, kontratlardaki veya sunucudaki belirli bir kontrolden gelir.">
         <dl className="grid grid-cols-1 border border-rule bg-surface md:grid-cols-2">
           {GUARANTEES.map(([g, why], i) => (
             <div key={g} className={`border-rule px-5 py-4 ${i % 2 === 0 ? "md:border-r" : ""} ${i > 0 ? "border-t" : ""} ${i === 1 ? "md:border-t-0" : ""}`}>

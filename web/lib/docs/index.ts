@@ -8,14 +8,14 @@ import path from "node:path";
  */
 
 export const DOCS = [
-  { slug: "architecture", file: "ARCHITECTURE.md", title: "Architecture", summary: "Layers, pipeline, runtime topology, verified facts." },
-  { slug: "jev-integration", file: "JEV_INTEGRATION.md", title: "Jev integration", summary: "How each Jev concept maps to code and chain." },
-  { slug: "data-model", file: "DATA_MODEL.md", title: "Data model", summary: "On-chain structs, off-chain payloads, value provenance." },
-  { slug: "contract-spec", file: "CONTRACT_SPEC.md", title: "Contract specification", summary: "Roles, lifecycle, aggregation, settlement, events." },
-  { slug: "security-model", file: "SECURITY_MODEL.md", title: "Security model", summary: "Threats, mitigations, explicit trust assumptions." },
-  { slug: "design-system", file: "DESIGN_SYSTEM.md", title: "Design system", summary: "Typography, colour, components, voice." },
-  { slug: "demo-flow", file: "DEMO_FLOW.md", title: "Demo flow", summary: "Judge script and failure handling." },
-  { slug: "deployment", file: "DEPLOYMENT.md", title: "Deployment", summary: "Network facts, keys, contracts, Vercel." },
+  { slug: "architecture", file: "ARCHITECTURE.md", title: "Mimari", summary: "Katmanlar, pipeline, çalışma topolojisi, doğrulanmış bilgiler." },
+  { slug: "jev-integration", file: "JEV_INTEGRATION.md", title: "Jev entegrasyonu", summary: "Her Jev kavramının koda ve zincire nasıl eşlendiği." },
+  { slug: "data-model", file: "DATA_MODEL.md", title: "Veri modeli", summary: "Zincir üstü yapılar, zincir dışı veri yükleri, değerlerin kökeni." },
+  { slug: "contract-spec", file: "CONTRACT_SPEC.md", title: "Kontrat spesifikasyonu", summary: "Roller, yaşam döngüsü, toplama, uzlaşma, olaylar." },
+  { slug: "security-model", file: "SECURITY_MODEL.md", title: "Güvenlik modeli", summary: "Tehditler, önlemler, açık güven varsayımları." },
+  { slug: "design-system", file: "DESIGN_SYSTEM.md", title: "Tasarım sistemi", summary: "Tipografi, renk, bileşenler, dil." },
+  { slug: "demo-flow", file: "DEMO_FLOW.md", title: "Demo akışı", summary: "Jüri senaryosu ve hata yönetimi." },
+  { slug: "deployment", file: "DEPLOYMENT.md", title: "Dağıtım", summary: "Ağ bilgileri, anahtarlar, kontratlar, Vercel." },
 ] as const;
 
 export type DocSlug = (typeof DOCS)[number]["slug"];

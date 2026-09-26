@@ -23,14 +23,14 @@ export function CurrentDecision({ chain, chainNote }: { chain: DecisionView | nu
         v={chain}
         header={
           <Header
-            title={`Decision #${chain.decisionId}`}
+            title={`Karar #${chain.decisionId}`}
             meta={
               <>
                 <StatusMark tone={chain.status === "RESOLVED" ? "pass" : chain.status === "CANCELLED" ? "fail" : "wait"}>{chain.status}</StatusMark>
-                <span>on-chain · created {chain.createdAt ? formatUtc(chain.createdAt) : "—"}</span>
+                <span>zincir üstü · oluşturulma {chain.createdAt ? formatUtc(chain.createdAt) : "—"}</span>
               </>
             }
-            link={{ href: `/decisions/${chain.decisionId}`, label: "Full audit record" }}
+            link={{ href: `/decisions/${chain.decisionId}`, label: "Tam denetim kaydı" }}
           />
         }
       />
@@ -43,26 +43,26 @@ export function CurrentDecision({ chain, chainNote }: { chain: DecisionView | nu
         v={v}
         header={
           <Header
-            title={v.mode === "live" && v.decisionId ? `Decision #${v.decisionId}` : "Simulation round"}
+            title={v.mode === "live" && v.decisionId ? `Karar #${v.decisionId}` : "Simülasyon turu"}
             meta={
               <>
-                <StatusMark tone={v.mode === "live" ? "accent" : "neutral"}>{v.mode}</StatusMark>
-                <span>run from this browser · {formatUtc(Math.floor(stored.savedAt / 1000))}</span>
-                {v.mode === "simulation" && <span className="text-ink-3">not committed on-chain</span>}
+                <StatusMark tone={v.mode === "live" ? "accent" : "neutral"}>{v.mode === "live" ? "canlı" : "simülasyon"}</StatusMark>
+                <span>bu tarayıcıdan çalıştırıldı · {formatUtc(Math.floor(stored.savedAt / 1000))}</span>
+                {v.mode === "simulation" && <span className="text-ink-3">zincire işlenmedi</span>}
               </>
             }
-            link={v.mode === "live" && v.decisionId ? { href: `/decisions/${v.decisionId}`, label: "Full audit record" } : { href: "/demo", label: "Run another round" }}
+            link={v.mode === "live" && v.decisionId ? { href: `/decisions/${v.decisionId}`, label: "Tam denetim kaydı" } : { href: "/demo", label: "Yeni bir tur çalıştır" }}
           />
         }
       />
     );
   }
   return (
-    <EmptyState title="No decision yet" action={<LinkButton href="/demo" variant="primary">Run a round</LinkButton>}>
+    <EmptyState title="Henüz karar yok" action={<LinkButton href="/demo" variant="primary">Tur çalıştır</LinkButton>}>
       <p>{chainNote}</p>
       <p className="mt-2">
-        A round snapshots the current state below, asks the five analysts its questions in parallel, and applies the deterministic rules. The result
-        appears here.
+        Bir tur aşağıdaki güncel durumun anlık görüntüsünü alır, beş analiste sorularını paralel olarak sorar ve deterministik kuralları uygular.
+        Sonuç burada görünür.
       </p>
     </EmptyState>
   );

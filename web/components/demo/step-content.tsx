@@ -10,6 +10,7 @@ import { Table, Td, Th } from "@/components/ui/table";
 import { explorer } from "@/lib/chain/monad";
 import { formatBps, formatMon, formatPrice, formatUtc, shortHex } from "@/lib/format";
 import { AGENTS } from "@/lib/jev/agents";
+import { AGENT_TR, FORK_TR, agentName, resultLabel } from "@/lib/i18n";
 import { ACTION_SPACE } from "@/lib/model/action";
 import type { Settlement } from "@/lib/model/accountability";
 import { FORKS } from "@/lib/types/protocol";
@@ -39,7 +40,7 @@ export function StateStep({ v, live, commitTx }: { v: DecisionView; live: boolea
       <StatePanel v={v} withInputs={false} />
       {v.state.inputs && (
         <details>
-          <summary className="cursor-pointer text-[12.5px] text-ink">All {v.state.inputs.length} inputs, with source and status</summary>
+          <summary className="cursor-pointer text-[12.5px] text-ink">Kaynak ve durumlarıyla {v.state.inputs.length} girdinin tümü</summary>
           <div className="mt-2">
             <StatePanel v={{ ...v, state: { ...v.state } }} withInputs />
           </div>
@@ -47,7 +48,7 @@ export function StateStep({ v, live, commitTx }: { v: DecisionView; live: boolea
       )}
       {live && commitTx?.hash && (
         <p className="text-[12.5px] text-ink-2">
-          Hash committed on-chain before any agent ran:{" "}
+          Hiçbir ajan çalışmadan önce hash zincire işlendi:{" "}
           <a className="font-mono underline decoration-rule underline-offset-2 hover:decoration-ink" href={explorer.tx(commitTx.hash)} target="_blank" rel="noreferrer">
             createDecision {shortHex(commitTx.hash, 4, 4)}
           </a>
@@ -82,7 +83,7 @@ export function ParallelStep({ v, startedAt }: { v: DecisionView; startedAt: num
                 <StatusMark tone="fail">{a.failure.label}</StatusMark>
               ) : (
                 <StatusMark tone={a.status === "ok" ? "pass" : a.status === "processing" ? "wait" : "neutral"} live={a.status === "processing"}>
-                  {a.status === "ok" ? "decided" : a.status === "processing" ? "evaluating" : a.status}
+                  {a.status === "ok" ? "karar verdi" : a.status === "processing" ? "değerlendiriyor" : a.status === "missed" ? "kaçırdı" : "bekliyor"}
                 </StatusMark>
               )}
             </span>
@@ -93,7 +94,7 @@ export function ParallelStep({ v, startedAt }: { v: DecisionView; startedAt: num
           </div>
         );
       })}
-      <p className="px-4 py-2 text-[11.5px] text-ink-3">All five start together; bars share one time axis. No agent sees another&apos;s output.</p>
+      <p className="px-4 py-2 text-[11.5px] text-ink-3">Beşi birlikte başlar; çubuklar aynı zaman eksenini paylaşır. Hiçbir ajan diğerinin çıktısını görmez.</p>
     </div>
   );
 }
@@ -112,12 +113,12 @@ export function BatchStep({ v, decision }: { v: DecisionView; decision: { agentD
   const cell = (agentId: number, q: number) => decision?.agentDecisions.find((d) => d.agentId === agentId && d.questionIndex === q);
   return (
     <div className="space-y-2">
-      <Table caption="Question-level decisions">
+      <Table caption="Soru düzeyindeki kararlar">
         <thead>
           <tr>
-            <Th>Question</Th>
+            <Th>Soru</Th>
             {AGENTS.map((a) => (
-              <Th key={a.key}>{a.name.replace(" Analyst", "")}</Th>
+              <Th key={a.key}>{AGENT_TR[a.key]?.short ?? a.name}</Th>
             ))}
           </tr>
         </thead>
@@ -126,11 +127,11 @@ export function BatchStep({ v, decision }: { v: DecisionView; decision: { agentD
             <tr key={q.questionId} className={q.index === 0 ? "bg-surface-2" : ""}>
               <Td className="whitespace-nowrap">
                 <span className="font-mono text-ink-3">Q{q.index}</span> <span className="text-[11px] font-medium tracking-[0.06em]">{q.category}</span>
-                {q.index === 0 && <span className="block text-[11px] text-accent">final decision → aggregation</span>}
+                {q.index === 0 && <span className="block text-[11px] text-accent">nihai karar → toplama</span>}
               </Td>
               {AGENTS.map((a) => {
                 const d = cell(a.agentId, q.index);
-                const assigned = q.answeredBy.includes(a.name);
+                const assigned = q.answeredBy.includes(agentName(a.key, a.name));
                 return (
                   <Td key={a.key} className="whitespace-nowrap">
                     {d ? (
@@ -141,7 +142,7 @@ export function BatchStep({ v, decision }: { v: DecisionView; decision: { agentD
                         </span>
                       </span>
                     ) : assigned ? (
-                      muted("no answer")
+                      muted("yanıt yok")
                     ) : (
                       <span className="text-ink-3">·</span>
                     )}
@@ -153,8 +154,8 @@ export function BatchStep({ v, decision }: { v: DecisionView; decision: { agentD
         </tbody>
       </Table>
       <p className="text-[12px] text-ink-2">
-        Each agent answers its own domain question and the action question as one batch. Every answer is a separate record (on-chain in live mode);
-        only the Q0 answers are aggregated, the domain answers are the evidence behind them.
+        Her ajan kendi alan sorusunu ve eylem sorusunu tek bir toplu gönderimde yanıtlar. Her yanıt ayrı bir kayıttır (canlı modda zincirde);
+        yalnızca Q0 yanıtları toplanır, alan yanıtları bunların arkasındaki kanıttır.
       </p>
     </div>
   );
@@ -165,14 +166,14 @@ export function BatchStep({ v, decision }: { v: DecisionView; decision: { agentD
 export function ForksStep({ v, allowed }: { v: DecisionView; allowed: string[] }) {
   const counts = Object.fromEntries(FORKS.map((f) => [f, v.agents.filter((a) => a.choice === f).length]));
   return (
-    <Table caption="Bounded action space">
+    <Table caption="Sınırlı eylem uzayı">
       <thead>
         <tr>
-          <Th>Fork</Th>
-          <Th>Alias</Th>
-          <Th>Effect</Th>
-          <Th>Allowed</Th>
-          <Th align="right">Final choices</Th>
+          <Th>Çatal</Th>
+          <Th>Kısa ad</Th>
+          <Th>Etki</Th>
+          <Th>İzinli</Th>
+          <Th align="right">Nihai seçimler</Th>
         </tr>
       </thead>
       <tbody>
@@ -180,8 +181,8 @@ export function ForksStep({ v, allowed }: { v: DecisionView; allowed: string[] }
           <tr key={f}>
             <Td mono>{f}</Td>
             <Td mono className="text-ink-2">{ACTION_SPACE[f].alias}</Td>
-            <Td className="min-w-[260px] text-ink-2">{ACTION_SPACE[f].effect}</Td>
-            <Td>{allowed.includes(f) ? <StatusMark tone="pass">yes</StatusMark> : <StatusMark tone="neutral">no</StatusMark>}</Td>
+            <Td className="min-w-[260px] text-ink-2">{FORK_TR[f].effect}</Td>
+            <Td>{allowed.includes(f) ? <StatusMark tone="pass">evet</StatusMark> : <StatusMark tone="neutral">hayır</StatusMark>}</Td>
             <Td align="right" mono>{counts[f]}</Td>
           </tr>
         ))}
@@ -204,13 +205,13 @@ export function AggregationStep({ v }: { v: DecisionView }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 border border-rule bg-surface md:grid-cols-4 [&>*]:border-rule max-md:[&>*:nth-child(odd)]:border-r max-md:[&>*:nth-child(n+3)]:border-t md:[&>*:not(:last-child)]:border-r">
-        {fig("Selected choice", g ? g.leading : muted("—"), g ? `${g.submissions} final decisions` : undefined)}
-        {fig("Aggregate score", g?.aggregateScore ?? muted("—"), "mean score of backers")}
-        {fig("Aggregate probability", g?.aggregateProbability != null ? formatBps(g.aggregateProbability, 1) : muted("—"), "mean probability of backers")}
+        {fig("Seçilen çatal", g ? g.leading : muted("—"), g ? `${g.submissions} nihai karar` : undefined)}
+        {fig("Toplam skor", g?.aggregateScore ?? muted("—"), "destekçilerin ortalama skoru")}
+        {fig("Toplam olasılık", g?.aggregateProbability != null ? formatBps(g.aggregateProbability, 1) : muted("—"), "destekçilerin ortalama olasılığı")}
         {fig(
-          "Threshold",
+          "Eşik",
           g?.supportShareBps != null ? formatBps(g.supportShareBps, 1) : muted("—"),
-          g ? <StatusMark tone={g.passed ? "pass" : "fail"}>{g.passed ? `passed · ≥ ${formatBps(v.threshold.thresholdBps, 0)}` : `not met · ${formatBps(v.threshold.thresholdBps, 0)} required`}</StatusMark> : undefined,
+          g ? <StatusMark tone={g.passed ? "pass" : "fail"}>{g.passed ? `geçti · ≥ ${formatBps(v.threshold.thresholdBps, 0)}` : `sağlanmadı · gereken ${formatBps(v.threshold.thresholdBps, 0)}`}</StatusMark> : undefined,
         )}
       </div>
       <AggregationPanel v={v} />
@@ -222,26 +223,26 @@ export function AggregationStep({ v }: { v: DecisionView }) {
 
 export function ActionStep({ v, mode, sim }: { v: DecisionView; mode: DemoMode; sim: { fork: string; start: { price: string; expo: number; publishTime: number } } | null }) {
   const a = v.action;
-  if (!a) return <p className="text-[13px] text-ink-3">{v.aggregation?.guardianRequired ? "Agents escalated: a guardian must choose among the bounded forks." : "Waiting for aggregation."}</p>;
+  if (!a) return <p className="text-[13px] text-ink-3">{v.aggregation?.guardianRequired ? "Ajanlar yükseltti: bir guardian sınırlı çatallar arasından seçim yapmalı." : "Toplama bekleniyor."}</p>;
   const passed = v.aggregation?.passed;
   return (
     <div className="border border-rule bg-surface px-4 py-3 text-[13px]">
       <p>
         <span className="font-mono text-[15px]">{a.fork}</span> <span className="text-ink-2">· {a.alias}</span>{" "}
-        <StatusMark tone={passed ? "pass" : "neutral"}>{passed ? "threshold passed — selected action" : "threshold not met — fail-safe"}</StatusMark>
+        <StatusMark tone={passed ? "pass" : "neutral"}>{passed ? "eşik geçildi — seçilen eylem" : "eşik sağlanmadı — güvenli varsayılan"}</StatusMark>
       </p>
       <p className="mt-1 text-ink-2">{a.effect}</p>
       <p className="mt-1 text-[12px] text-ink-3">
-        Approved by {a.approvedBy}. {a.fork === "NO_ACTION" ? "Nothing moves; the start price is still recorded so the outcome can be verified." : "Only this predefined branch of ExecutionVault can run."}
+        Onaylayan: {a.approvedBy}. {a.fork === "NO_ACTION" ? "Hiçbir şey taşınmaz; sonuç doğrulanabilsin diye başlangıç fiyatı yine kaydedilir." : "Yalnızca ExecutionVault'un bu önceden tanımlı dalı çalışabilir."}
       </p>
       {mode === "simulation" && sim && (
         <p className="mt-2 border-t border-rule pt-2 text-[12.5px] text-ink-2">
-          Applied to the local vault model (no funds, no transaction). Start price {formatPrice(BigInt(sim.start.price), sim.start.expo)} USD, published {formatUtc(sim.start.publishTime)}.
+          Yerel kasa modeline uygulandı (fon yok, işlem yok). Başlangıç fiyatı {formatPrice(BigInt(sim.start.price), sim.start.expo)} USD, yayın zamanı {formatUtc(sim.start.publishTime)}.
         </p>
       )}
       {mode === "live" && v.execution.status === "executed" && (
         <p className="mt-2 border-t border-rule pt-2 font-mono text-[12.5px] text-ink-2">
-          moved {v.execution.amountMoved ? formatMon(BigInt(v.execution.amountMoved)) : "0"} MON · start price {v.execution.startPrice} USD
+          taşınan {v.execution.amountMoved ? formatMon(BigInt(v.execution.amountMoved)) : "0"} MON · başlangıç fiyatı {v.execution.startPrice} USD
         </p>
       )}
     </div>
@@ -268,15 +269,15 @@ export function MonadStep({
   if (mode === "simulation") {
     return (
       <p className="border border-dashed border-rule px-4 py-3 text-[13px] text-ink-2">
-        No transactions. Simulation mode never submits anything to Monad; switch to live testnet mode to see the same round committed, executed and
-        settled on-chain.
+        İşlem yok. Simülasyon modu Monad&apos;a hiçbir şey göndermez; aynı turun zincire işlenmesini, yürütülmesini ve uzlaşmasını görmek için canlı
+        testnet moduna geçin.
       </p>
     );
   }
   return (
     <div className="space-y-3">
       <ol className="border border-rule bg-surface">
-        {txs.length === 0 && <li className="px-4 py-2.5 text-[12.5px] text-ink-3">No transactions yet.</li>}
+        {txs.length === 0 && <li className="px-4 py-2.5 text-[12.5px] text-ink-3">Henüz işlem yok.</li>}
         {txs.map((t) => (
           <li key={t.label} className="dm-arrive grid grid-cols-[1fr_auto] gap-3 border-b border-rule px-4 py-2 text-[12.5px] last:border-b-0">
             <div className="min-w-0">
@@ -290,7 +291,7 @@ export function MonadStep({
                 </a>
               )}
               <StatusMark tone={t.status === "confirmed" ? "pass" : t.status === "failed" ? "fail" : "wait"} live={t.status === "pending"}>
-                {t.status}
+                {t.status === "confirmed" ? "onaylandı" : t.status === "failed" ? "başarısız" : t.status === "pending" ? "bekliyor" : t.status}
               </StatusMark>
             </div>
           </li>
@@ -299,18 +300,18 @@ export function MonadStep({
       {walletTx && <TxLifecycle state={walletTx} />}
       {awaiting && (
         <div className="flex flex-wrap items-center gap-3 border border-accent px-4 py-3">
-          <p className="min-w-0 flex-1 basis-64 text-[13px]">The action is approved on-chain. Execute it from your wallet — anyone may; the contract decides what runs.</p>
+          <p className="min-w-0 flex-1 basis-64 text-[13px]">Eylem zincirde onaylandı. Cüzdanınızdan yürütün — herkes yürütebilir; neyin çalışacağına kontrat karar verir.</p>
           {!isConnected ? (
-            <span className="text-[12.5px] text-ink-2">Connect a wallet (top right) to approve, or</span>
+            <span className="text-[12.5px] text-ink-2">Onaylamak için cüzdan bağlayın (sağ üst) ya da</span>
           ) : chainId !== 10143 ? (
             <Button variant="secondary" onClick={() => switchChain({ chainId: 10143 })}>
-              Switch to Monad Testnet
+              Monad Testnet&apos;e geç
             </Button>
           ) : (
-            <Button onClick={() => onExecute("wallet")}>Approve in wallet</Button>
+            <Button onClick={() => onExecute("wallet")}>Cüzdanda onayla</Button>
           )}
           <Button variant="secondary" onClick={() => onExecute("keeper")}>
-            Execute via keeper
+            Keeper ile yürüt
           </Button>
         </div>
       )}
@@ -327,7 +328,7 @@ export function Countdown({ label, until, total }: { label: string; until: numbe
   return (
     <div className="border border-rule bg-surface px-4 py-3">
       <div className="flex items-baseline justify-between text-[12.5px]">
-        <span>Waiting for the {label}</span>
+        <span>Bekleniyor: {label}</span>
         <span className="font-mono tabular">{Math.ceil(left)} s</span>
       </div>
       <div className="mt-2 h-1 bg-surface-2">
@@ -350,16 +351,16 @@ export function VerifyStep({ r, mode }: { r: VerifyResult | null; mode: DemoMode
     <div className="border border-rule bg-surface">
       <div className="grid grid-cols-[120px_1fr_1fr] gap-3 border-b border-rule bg-surface-2 px-4 py-2">
         <span />
-        <span className="label">Expected</span>
-        <span className="label">Observed</span>
+        <span className="label">Beklenen</span>
+        <span className="label">Gözlenen</span>
       </div>
-      {row("Action", r.expected, <span className={r.success ? "text-pass" : "text-fail"}>{r.observed}</span>)}
-      {row("Price", `${r.startPrice} USD${r.startTime ? ` · ${formatUtc(r.startTime).slice(11)}` : ""}`, `${r.endPrice} USD${r.endTime ? ` · ${formatUtc(r.endTime).slice(11)}` : ""}`)}
-      {row("Move", `band ±${r.bandBps} bps`, `${r.moveBps} bps`)}
+      {row("Eylem", r.expected, <span className={r.success ? "text-pass" : "text-fail"}>{r.observed}</span>)}
+      {row("Fiyat", `${r.startPrice} USD${r.startTime ? ` · ${formatUtc(r.startTime).slice(11)}` : ""}`, `${r.endPrice} USD${r.endTime ? ` · ${formatUtc(r.endTime).slice(11)}` : ""}`)}
+      {row("Hareket", `bant ±${r.bandBps} bps`, `${r.moveBps} bps`)}
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-        <StatusMark tone={r.success ? "pass" : "fail"}>{r.success ? "success — expected equals observed" : "miss — expected differs from observed"}</StatusMark>
+        <StatusMark tone={r.success ? "pass" : "fail"}>{r.success ? "başarılı — beklenen gözlenene eşit" : "isabetsiz — beklenen gözlenenden farklı"}</StatusMark>
         <span className="text-[11.5px] text-ink-3">
-          {mode === "live" ? "Recorded by OutcomeRegistry from a signed Pyth price inside the window." : "Observed from the published Pyth price; not verified on-chain in simulation."}
+          {mode === "live" ? "OutcomeRegistry tarafından pencere içindeki imzalı bir Pyth fiyatından kaydedildi." : "Yayımlanan Pyth fiyatından gözlendi; simülasyonda zincirde doğrulanmaz."}
         </span>
       </div>
     </div>
@@ -376,15 +377,15 @@ export function SettlementStep({ mode, v, sim }: { mode: DemoMode; v: DecisionVi
   if (rows.length === 0) return null;
   return (
     <div className="space-y-2">
-      <Table caption="Settlement">
+      <Table caption="Uzlaşma">
         <thead>
           <tr>
-            <Th>Agent</Th>
-            <Th>Prediction</Th>
-            <Th>Result</Th>
-            <Th align="right">Bond</Th>
-            <Th align="right">Reward</Th>
-            <Th align="right">Penalty</Th>
+            <Th>Ajan</Th>
+            <Th>Tahmin</Th>
+            <Th>Sonuç</Th>
+            <Th align="right">Teminat</Th>
+            <Th align="right">Ödül</Th>
+            <Th align="right">Ceza</Th>
             <Th align="right">Net</Th>
           </tr>
         </thead>
@@ -393,10 +394,10 @@ export function SettlementStep({ mode, v, sim }: { mode: DemoMode; v: DecisionVi
             const a = v.agents.find((x) => x.agentId === l.agentId);
             return (
               <tr key={l.agentId}>
-                <Td className="whitespace-nowrap font-medium">{a?.name ?? `Agent ${l.agentId}`}</Td>
-                <Td mono className="whitespace-nowrap">{a?.choice ? `${a.choice} · ${formatBps(a.probability ?? 0, 0)}` : muted("none")}</Td>
+                <Td className="whitespace-nowrap font-medium">{a?.name ?? `Ajan ${l.agentId}`}</Td>
+                <Td mono className="whitespace-nowrap">{a?.choice ? `${a.choice} · ${formatBps(a.probability ?? 0, 0)}` : muted("yok")}</Td>
                 <Td>
-                  <StatusMark tone={l.result === "CORRECT" ? "pass" : l.result === "NEUTRAL" || !l.result ? "neutral" : "fail"}>{l.result ?? "—"}</StatusMark>
+                  <StatusMark tone={l.result === "CORRECT" ? "pass" : l.result === "NEUTRAL" || !l.result ? "neutral" : "fail"}>{l.result ? resultLabel(l.result) : "—"}</StatusMark>
                 </Td>
                 <Td align="right" mono>{formatMon(l.bond)}</Td>
                 <Td align="right" mono>{formatMon(l.reward)}</Td>
@@ -411,8 +412,8 @@ export function SettlementStep({ mode, v, sim }: { mode: DemoMode; v: DecisionVi
       </Table>
       <p className="text-[12px] text-ink-3">
         {mode === "simulation"
-          ? "Computed with OutcomeRegistry's formula on notional bonds (MON). No bond was locked and nothing is transferred."
-          : "Applied by OutcomeRegistry in the resolve transaction; bonds and the reward pool changed on-chain."}
+          ? "OutcomeRegistry formülüyle itibari teminatlar (MON) üzerinden hesaplandı. Hiçbir teminat kilitlenmedi ve hiçbir şey transfer edilmedi."
+          : "OutcomeRegistry tarafından resolve işleminde uygulandı; teminatlar ve ödül havuzu zincirde değişti."}
       </p>
     </div>
   );

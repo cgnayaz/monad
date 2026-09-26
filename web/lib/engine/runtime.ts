@@ -40,7 +40,7 @@ export const DEMO_PARAMETERS: DecisionParameters = {
 
 export function chainExecutionLayer(): { layer: ChainExecutionLayer } | { layer: null; reason: string } {
   const d = deployment();
-  if (!d.deployed) return { layer: null, reason: "Contracts are not deployed; nothing is written on-chain" };
+  if (!d.deployed) return { layer: null, reason: "Kontratlar dağıtılmamış; zincire hiçbir şey yazılmaz" };
   const env = serverEnv();
   const agents = Object.fromEntries(AGENTS.map((a) => [a.key, env[a.operatorKeyEnv]])) as Record<AgentKey, Hex | undefined>;
   const missing = [
@@ -48,7 +48,7 @@ export function chainExecutionLayer(): { layer: ChainExecutionLayer } | { layer:
     ...(env.KEEPER_PRIVATE_KEY ? [] : ["keeper"]),
     ...AGENTS.filter((a) => !agents[a.key]).map((a) => a.name),
   ];
-  if (missing.length) return { layer: null, reason: `Signers not configured (${missing.join(", ")}); nothing is written on-chain` };
+  if (missing.length) return { layer: null, reason: `İmzacılar yapılandırılmamış (${missing.join(", ")}); zincire hiçbir şey yazılmaz` };
   return {
     layer: new ChainExecutionLayer(
       d.addresses,
@@ -66,7 +66,7 @@ export async function pipelineSetup(mode: "simulation" | "live" = "live"): Promi
 
   const available = chainExecutionLayer();
   if (mode === "live" && !available.layer) return { ok: false, reason: `Live testnet mode unavailable: ${available.reason}` };
-  const chain = mode === "live" ? available : { layer: null, reason: "Simulation mode: no transactions are sent" };
+  const chain = mode === "live" ? available : { layer: null, reason: "Simülasyon modu: hiçbir işlem gönderilmez" };
   let reputation: ReputationRecords = { source: "none-recorded", records: {} };
   if (chain.layer) {
     reputation = await chain.layer.reputation();
@@ -74,7 +74,7 @@ export async function pipelineSetup(mode: "simulation" | "live" = "live"): Promi
     const views = await listAgents();
     const records: ReputationRecords["records"] = {};
     for (const v of views) {
-      if (v.onChain.status !== "ok") return { ok: false, reason: `Agent record unavailable: ${v.onChain.reason}` };
+      if (v.onChain.status !== "ok") return { ok: false, reason: `Ajan kaydı okunamadı: ${v.onChain.reason}` };
       records[v.spec.agentId] = { submitted: v.onChain.value.submitted, correct: v.onChain.value.correct };
     }
     reputation = { source: "chain", records };

@@ -22,7 +22,7 @@ const label: Record<JevStageState, string> = {
  */
 export function JevTrack({ stages }: { stages: JevStage[] }) {
   return (
-    <ol aria-label="Jev lifecycle" className="grid grid-cols-1 border border-rule bg-surface md:grid-cols-3 2xl:grid-cols-6">
+    <ol aria-label="Jev yaşam döngüsü" className="grid grid-cols-1 border border-rule bg-surface md:grid-cols-3 2xl:grid-cols-6">
       {stages.map((s, i) => (
         <li
           key={s.key}

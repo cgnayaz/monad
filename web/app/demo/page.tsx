@@ -29,8 +29,8 @@ export default async function DemoPage() {
     <>
       <PageHeader
         eyebrow="Demo"
-        title="One decision, from state to settlement"
-        lead="Jev structures the decision. Five agents evaluate the state in parallel. DecMarkt aggregates their output with fixed rules and makes it accountable. Monad executes and records the action, and the observed outcome settles every bond."
+        title="Tek karar: durumdan uzlaşmaya"
+        lead="Jev kararı yapılandırır. Beş ajan durumu paralel olarak değerlendirir. DecMarkt çıktılarını sabit kurallarla toplar ve hesap verebilir kılar. Monad eylemi yürütür ve kaydeder; gözlenen sonuç her teminatı uzlaştırır."
       />
       <Demo modes={r.modes} idle={idle} allowedForks={DEMO_PARAMETERS.allowedForks} />
     </>

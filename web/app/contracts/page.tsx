@@ -12,17 +12,17 @@ import { listContracts, liveParameters, networkStatus, pythStatus } from "@/lib/
 import { DEFAULT_PARAMS, PARAM_CAPS } from "@/lib/decmarkt/params";
 import { formatMon } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Contracts" };
+export const metadata: Metadata = { title: "Kontratlar" };
 export const dynamic = "force-dynamic";
 
 const ROLES = [
-  ["DEFAULT_ADMIN_ROLE", "Deployer and operator wallet", "Set parameters within hard caps, pause, grant roles; withdraw only while paused"],
-  ["PROPOSER_ROLE", "Server proposer key", "Create and open decisions; cancel before aggregation"],
-  ["GUARDIAN_ROLE", "Human wallet", "Choose a bounded action when agents escalate"],
-  ["ENGINE_ROLE", "DecisionEngine", "OPEN → AGGREGATED → APPROVED, or CANCELLED on missing quorum"],
+  ["DEFAULT_ADMIN_ROLE", "Dağıtıcı ve operatör cüzdanı", "Parametreleri sert sınırlar içinde ayarlar, duraklatır, rol verir; yalnızca duraklatılmışken çekim yapar"],
+  ["PROPOSER_ROLE", "Sunucu proposer anahtarı", "Karar oluşturur ve açar; toplamadan önce iptal eder"],
+  ["GUARDIAN_ROLE", "İnsan cüzdanı", "Ajanlar yükselttiğinde sınırlı bir eylem seçer"],
+  ["ENGINE_ROLE", "DecisionEngine", "OPEN → AGGREGATED → APPROVED; yeter sayı yoksa CANCELLED"],
   ["VAULT_ROLE", "ExecutionVault", "APPROVED → EXECUTED"],
-  ["OUTCOME_ROLE", "OutcomeRegistry", "Apply settlement and EXECUTED → RESOLVED"],
-  ["agent operator", "One address per agent", "submit / submitBatch for its own agent id; withdraw its free bond"],
+  ["OUTCOME_ROLE", "OutcomeRegistry", "Uzlaşmayı uygular ve EXECUTED → RESOLVED"],
+  ["ajan operatörü", "Ajan başına bir adres", "Kendi ajan kimliği için submit / submitBatch; serbest teminatını çeker"],
 ] as const;
 
 export default async function ContractsPage() {
@@ -32,44 +32,44 @@ export default async function ContractsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Monad execution & settlement layer"
-        title="Contracts"
-        lead="Four contracts with separated responsibilities. Each lifecycle transition belongs to exactly one of them; the vault has no external call path. Every address and value below is read from the network on each request."
+        eyebrow="Monad yürütme ve uzlaşma katmanı"
+        title="Kontratlar"
+        lead="Sorumlulukları ayrılmış dört kontrat. Her yaşam döngüsü geçişi tam olarak birine aittir; kasanın dış çağrı yolu yoktur. Aşağıdaki her adres ve değer her istekte ağdan okunur."
       />
 
       <div className="mb-14 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Panel title="Network">
+        <Panel title="Ağ">
           <KeyValue
             rows={[
-              { k: "Network", v: MONAD_TESTNET.name },
-              { k: "Chain id", v: <Avail value={net.chainId}>{(id) => <span className="font-mono">{id}{id !== MONAD_TESTNET.id && <span className="text-fail"> (expected {MONAD_TESTNET.id})</span>}</span>}</Avail> },
-              { k: "Latest block", v: <Avail value={net.blockNumber}>{(b) => <a className="font-mono underline decoration-rule underline-offset-2 hover:decoration-ink" href={explorer.block(b)} target="_blank" rel="noreferrer">{b.toLocaleString("en-US")}</a>}</Avail> },
+              { k: "Ağ", v: MONAD_TESTNET.name },
+              { k: "Zincir kimliği", v: <Avail value={net.chainId}>{(id) => <span className="font-mono">{id}{id !== MONAD_TESTNET.id && <span className="text-fail"> (beklenen {MONAD_TESTNET.id})</span>}</span>}</Avail> },
+              { k: "Son blok", v: <Avail value={net.blockNumber}>{(b) => <a className="font-mono underline decoration-rule underline-offset-2 hover:decoration-ink" href={explorer.block(b)} target="_blank" rel="noreferrer">{b.toLocaleString("en-US")}</a>}</Avail> },
               { k: "RPC", v: <span className="font-mono text-[12.5px]">{MONAD_TESTNET.rpcUrl}</span> },
-              { k: "Explorer", v: <a className="text-[12.5px] underline decoration-rule underline-offset-2 hover:decoration-ink" href={MONAD_TESTNET.explorerUrl} target="_blank" rel="noreferrer">{MONAD_TESTNET.explorerUrl.replace("https://", "")}</a> },
+              { k: "Gezgin", v: <a className="text-[12.5px] underline decoration-rule underline-offset-2 hover:decoration-ink" href={MONAD_TESTNET.explorerUrl} target="_blank" rel="noreferrer">{MONAD_TESTNET.explorerUrl.replace("https://", "")}</a> },
             ]}
           />
         </Panel>
-        <Panel title="Deployment">
+        <Panel title="Dağıtım">
           <KeyValue
             rows={[
-              { k: "Status", v: <StatusMark tone={d.deployed ? "pass" : "neutral"}>{d.deployed ? "deployed" : "not deployed"}</StatusMark> },
-              { k: "Deploy block", v: d.deployed ? <span className="font-mono">{d.deployBlock.toString()}</span> : <span className="text-ink-3">—</span> },
-              { k: "Source", v: <a className="text-[12.5px] underline decoration-rule underline-offset-2 hover:decoration-ink" href={`${REPO_URL}/tree/main/contracts/src`} target="_blank" rel="noreferrer">contracts/src</a> },
-              { k: "Toolchain", v: <span className="text-[12.5px]">Solidity 0.8.28 · Foundry · OpenZeppelin 5.4 · Pyth SDK 2.2</span> },
-              ...(!d.deployed ? [{ k: "Missing", v: <span className="font-mono text-[12.5px] text-ink-2">{d.missing.join(", ")}</span> }] : []),
+              { k: "Durum", v: <StatusMark tone={d.deployed ? "pass" : "neutral"}>{d.deployed ? "dağıtıldı" : "dağıtılmadı"}</StatusMark> },
+              { k: "Dağıtım bloğu", v: d.deployed ? <span className="font-mono">{d.deployBlock.toString()}</span> : <span className="text-ink-3">—</span> },
+              { k: "Kaynak", v: <a className="text-[12.5px] underline decoration-rule underline-offset-2 hover:decoration-ink" href={`${REPO_URL}/tree/main/contracts/src`} target="_blank" rel="noreferrer">contracts/src</a> },
+              { k: "Araç zinciri", v: <span className="text-[12.5px]">Solidity 0.8.28 · Foundry · OpenZeppelin 5.4 · Pyth SDK 2.2</span> },
+              ...(!d.deployed ? [{ k: "Eksik", v: <span className="font-mono text-[12.5px] text-ink-2">{d.missing.join(", ")}</span> }] : []),
             ]}
           />
         </Panel>
         <WalletRoles />
       </div>
 
-      <Section title="DecMarkt contracts" description="Bytecode presence is checked against the RPC for every address.">
-        <Table caption="DecMarkt contracts">
+      <Section title="DecMarkt kontratları" description="Her adres için bytecode varlığı RPC üzerinden kontrol edilir.">
+        <Table caption="DecMarkt kontratları">
           <thead>
             <tr>
-              <Th>Contract</Th>
-              <Th>Responsibility</Th>
-              <Th>Address</Th>
+              <Th>Kontrat</Th>
+              <Th>Sorumluluk</Th>
+              <Th>Adres</Th>
               <Th>Bytecode</Th>
             </tr>
           </thead>
@@ -82,9 +82,9 @@ export default async function ContractsPage() {
                   </a>
                 </Td>
                 <Td className="min-w-[260px] text-ink-2">{c.role}</Td>
-                <Td>{c.address ? <Hash value={c.address} href={explorer.address(c.address)} /> : <StatusMark tone="neutral">not deployed</StatusMark>}</Td>
+                <Td>{c.address ? <Hash value={c.address} href={explorer.address(c.address)} /> : <StatusMark tone="neutral">dağıtılmadı</StatusMark>}</Td>
                 <Td mono>
-                  <Avail value={c.code}>{(v) => `${v.bytes.toLocaleString("en-US")} bytes`}</Avail>
+                  <Avail value={c.code}>{(v) => `${v.bytes.toLocaleString("en-US")} bayt`}</Avail>
                 </Td>
               </tr>
             ))}
@@ -92,29 +92,29 @@ export default async function ContractsPage() {
         </Table>
       </Section>
 
-      <Section title="Oracle" description="Pyth is the outcome authority. Read live from Monad Testnet.">
+      <Section title="Oracle" description="Sonuç otoritesi Pyth'tir. Monad Testnet'ten canlı okunur.">
         <div className="max-w-[760px]">
           <Panel>
             <KeyValue
               rows={[
-                { k: "Pyth contract", v: <Hash value={pyth.address} href={explorer.address(pyth.address)} full /> },
-                { k: "Version", v: <Avail value={pyth.version}>{(v) => <span className="font-mono">{v}</span>}</Avail> },
-                { k: "Valid time period", v: <Avail value={pyth.validTimePeriod}>{(v) => `${v} s`}</Avail> },
-                { k: "Feed", v: PYTH.feedSymbol },
-                { k: "Feed id", v: <Hash value={PYTH.feedId} /> },
+                { k: "Pyth kontratı", v: <Hash value={pyth.address} href={explorer.address(pyth.address)} full /> },
+                { k: "Sürüm", v: <Avail value={pyth.version}>{(v) => <span className="font-mono">{v}</span>}</Avail> },
+                { k: "Geçerlilik süresi", v: <Avail value={pyth.validTimePeriod}>{(v) => `${v} s`}</Avail> },
+                { k: "Besleme", v: PYTH.feedSymbol },
+                { k: "Besleme kimliği", v: <Hash value={PYTH.feedId} /> },
               ]}
             />
           </Panel>
         </div>
       </Section>
 
-      <Section title="Roles">
-        <Table caption="Roles">
+      <Section title="Roller">
+        <Table caption="Roller">
           <thead>
             <tr>
-              <Th>Role</Th>
-              <Th>Holder</Th>
-              <Th>Can</Th>
+              <Th>Rol</Th>
+              <Th>Sahibi</Th>
+              <Th>Yetkisi</Th>
             </tr>
           </thead>
           <tbody>
@@ -130,34 +130,34 @@ export default async function ContractsPage() {
       </Section>
 
       <Section
-        title="Parameters"
-        description={live.status === "ok" ? "Admin-set values as they are on-chain now; per-decision values are fixed when a decision is created." : "Deployment defaults from the deploy script. Not on-chain yet."}
+        title="Parametreler"
+        description={live.status === "ok" ? "Yöneticinin belirlediği değerler, şu an zincirde oldukları haliyle; karar başına değerler karar oluşturulurken sabitlenir." : "Dağıtım betiğindeki varsayılanlar. Henüz zincirde değil."}
       >
-        <Table caption="Parameters">
+        <Table caption="Parametreler">
           <thead>
             <tr>
-              <Th>Parameter</Th>
-              <Th align="right">{live.status === "ok" ? "On-chain" : "Default"}</Th>
-              <Th>Hard cap</Th>
-              <Th>Where</Th>
+              <Th>Parametre</Th>
+              <Th align="right">{live.status === "ok" ? "Zincirde" : "Varsayılan"}</Th>
+              <Th>Sert sınır</Th>
+              <Th>Nerede</Th>
             </tr>
           </thead>
           <tbody>
             {(
               [
-                ["thresholdBps", `${DEFAULT_PARAMS.thresholdBps}`, PARAM_CAPS.thresholdBps, "per decision"],
-                ["quorum", `${DEFAULT_PARAMS.quorum} of 5`, PARAM_CAPS.quorum, "per decision"],
-                ["minActionScore", `${DEFAULT_PARAMS.minActionScore}`, "≤ 10000", "per decision"],
-                ["submissionWindow · horizon", `${DEFAULT_PARAMS.submissionWindowSec} s · ${DEFAULT_PARAMS.horizonSec} s`, `${PARAM_CAPS.submissionWindowSec} · ${PARAM_CAPS.horizonSec}`, "per decision"],
-                ["bandBps", `${DEFAULT_PARAMS.bandBps}`, PARAM_CAPS.bandBps, "per decision"],
-                ["lockPerAgent", `${formatMon(DEFAULT_PARAMS.lockPerAgent, 2)} MON`, "> 0", "per decision"],
-                ["roundReward", live.status === "ok" ? `${formatMon(live.value.roundReward, 3)} MON` : `${formatMon(DEFAULT_PARAMS.roundReward, 3)} MON`, "reward pool", "DecisionRegistry"],
+                ["thresholdBps", `${DEFAULT_PARAMS.thresholdBps}`, PARAM_CAPS.thresholdBps, "karar başına"],
+                ["quorum", `5 üzerinden ${DEFAULT_PARAMS.quorum}`, PARAM_CAPS.quorum, "karar başına"],
+                ["minActionScore", `${DEFAULT_PARAMS.minActionScore}`, "≤ 10000", "karar başına"],
+                ["submissionWindow · horizon", `${DEFAULT_PARAMS.submissionWindowSec} s · ${DEFAULT_PARAMS.horizonSec} s`, `${PARAM_CAPS.submissionWindowSec} · ${PARAM_CAPS.horizonSec}`, "karar başına"],
+                ["bandBps", `${DEFAULT_PARAMS.bandBps}`, PARAM_CAPS.bandBps, "karar başına"],
+                ["lockPerAgent", `${formatMon(DEFAULT_PARAMS.lockPerAgent, 2)} MON`, "> 0", "karar başına"],
+                ["roundReward", live.status === "ok" ? `${formatMon(live.value.roundReward, 3)} MON` : `${formatMon(DEFAULT_PARAMS.roundReward, 3)} MON`, "ödül havuzu", "DecisionRegistry"],
                 ["slashBps · missPenaltyBps", live.status === "ok" ? `${live.value.slashBps} · ${live.value.missPenaltyBps}` : `${DEFAULT_PARAMS.slashBps} · ${DEFAULT_PARAMS.missPenaltyBps}`, `${PARAM_CAPS.slashBps} · ${PARAM_CAPS.missPenaltyBps}`, "OutcomeRegistry"],
                 ["actionBps · maxMove", live.status === "ok" ? `${live.value.actionBps} · ${formatMon(live.value.maxMove, 2)} MON` : `${DEFAULT_PARAMS.actionBps} · ${formatMon(DEFAULT_PARAMS.maxMove, 2)} MON`, PARAM_CAPS.actionBps, "ExecutionVault"],
                 ...(live.status === "ok"
                   ? ([
-                      ["reward pool", `${formatMon(live.value.rewardPool, 3)} MON`, "—", "DecisionRegistry"],
-                      ["vault ACTIVE · RESERVE", `${formatMon(live.value.vault.active, 3)} · ${formatMon(live.value.vault.reserve, 3)} MON`, "—", "ExecutionVault"],
+                      ["ödül havuzu", `${formatMon(live.value.rewardPool, 3)} MON`, "—", "DecisionRegistry"],
+                      ["kasa ACTIVE · RESERVE", `${formatMon(live.value.vault.active, 3)} · ${formatMon(live.value.vault.reserve, 3)} MON`, "—", "ExecutionVault"],
                     ] as const)
                   : []),
               ] as const

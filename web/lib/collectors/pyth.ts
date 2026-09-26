@@ -33,7 +33,7 @@ function scaled(p: { price: string; expo: number }): number {
 
 async function fetchPrice(path: string): Promise<PythSnapshot> {
   const env = serverEnv();
-  if (!env.PYTH_API_KEY) throw new Error("PYTH_API_KEY is not configured");
+  if (!env.PYTH_API_KEY) throw new Error("PYTH_API_KEY yapılandırılmamış");
   const id = PYTH.feedId;
   const url = `${env.PYTH_HERMES_URL}${path}?ids%5B%5D=${id}&parsed=true`;
   let res: Response | null = null;
@@ -104,7 +104,7 @@ export async function collectPythInputs(now: number): Promise<StateInput[]> {
       sourceRef: ref,
       observedAt: now,
       status: now - latest.price.publish_time > 60 ? "stale" : "ok",
-      ...(now - latest.price.publish_time > 60 ? { value: null, note: "latest price older than 60 s" } : {}),
+      ...(now - latest.price.publish_time > 60 ? { value: null, note: "son fiyat 60 sn'den eski" } : {}),
     },
   ];
 
@@ -145,7 +145,7 @@ export interface PriceUpdate {
 
 async function fetchUpdate(path: string): Promise<PriceUpdate> {
   const env = serverEnv();
-  if (!env.PYTH_API_KEY) throw new Error("PYTH_API_KEY is not configured; signed price updates are unavailable");
+  if (!env.PYTH_API_KEY) throw new Error("PYTH_API_KEY yapılandırılmamış; imzalı fiyat güncellemeleri alınamıyor");
   const url = `${env.PYTH_HERMES_URL}${path}?ids%5B%5D=${PYTH.feedId}&encoding=hex&parsed=true`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${env.PYTH_API_KEY}` },

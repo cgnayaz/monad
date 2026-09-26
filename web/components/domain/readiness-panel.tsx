@@ -2,18 +2,18 @@ import { StatusMark } from "@/components/ui/status";
 import type { Readiness } from "@/lib/data/readiness";
 
 const ROWS: { key: "contracts" | "oracle" | "ai" | "signers"; label: string }[] = [
-  { key: "contracts", label: "Contracts" },
+  { key: "contracts", label: "Kontratlar" },
   { key: "oracle", label: "Oracle" },
-  { key: "ai", label: "AI provider" },
-  { key: "signers", label: "Signers" },
+  { key: "ai", label: "AI sağlayıcı" },
+  { key: "signers", label: "İmzacılar" },
 ];
 
 export function ReadinessPanel({ r }: { r: Readiness }) {
   return (
     <div className="border border-rule bg-surface">
       <div className="flex items-center justify-between border-b border-rule px-4 py-2.5">
-        <span className="text-[13px] font-semibold">Live round readiness</span>
-        <StatusMark tone={r.ready ? "pass" : "wait"}>{r.ready ? "ready" : "not ready"}</StatusMark>
+        <span className="text-[13px] font-semibold">Canlı tur hazırlığı</span>
+        <StatusMark tone={r.ready ? "pass" : "wait"}>{r.ready ? "hazır" : "hazır değil"}</StatusMark>
       </div>
       <ul>
         {ROWS.map(({ key, label }) => (
@@ -23,6 +23,11 @@ export function ReadinessPanel({ r }: { r: Readiness }) {
           </li>
         ))}
       </ul>
+      {r.invalidEnv.length > 0 && (
+        <p className="border-t border-rule px-4 py-2.5 text-[12.5px] text-fail">
+          Geçersiz biçimli olduğu için yok sayılan değişkenler: <span className="font-mono">{r.invalidEnv.join(", ")}</span>
+        </p>
+      )}
     </div>
   );
 }

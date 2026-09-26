@@ -28,7 +28,7 @@ export function DecisionBoard({ v, header }: { v: DecisionView; header?: ReactNo
       {header}
       <JevTrack stages={v.stages} />
       <KeyFigures v={v} />
-      <Block title="Parallel decisions" aside={failed > 0 ? <span className="text-[12px] text-fail">{failed} agent(s) without a valid decision</span> : undefined}>
+      <Block title="Paralel kararlar" aside={failed > 0 ? <span className="text-[12px] text-fail">{failed} ajanın geçerli kararı yok</span> : undefined}>
         <AgentModules agents={v.agents} />
       </Block>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

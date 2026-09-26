@@ -45,22 +45,22 @@ export class AnthropicProvider implements DecisionProvider {
         { signal },
       );
     } catch (err) {
-      if (signal.aborted) throw new ProviderError("timeout", "No response within the agent time limit");
-      if (err instanceof Anthropic.APIUserAbortError) throw new ProviderError("timeout", "Request aborted");
-      if (err instanceof Anthropic.AuthenticationError) throw new ProviderError("provider_error", "Provider rejected credentials");
-      if (err instanceof Anthropic.RateLimitError) throw new ProviderError("provider_error", "Provider rate limit reached");
-      if (err instanceof Anthropic.APIConnectionTimeoutError) throw new ProviderError("timeout", "Provider connection timed out");
-      if (err instanceof Anthropic.APIConnectionError) throw new ProviderError("provider_error", "Could not reach the provider");
-      if (err instanceof Anthropic.PermissionDeniedError) throw new ProviderError("provider_error", "Provider denied access for this key");
-      if (err instanceof Anthropic.NotFoundError) throw new ProviderError("provider_error", `Model ${this.model} is not available for this key`);
-      if (err instanceof Anthropic.BadRequestError && /credit balance/i.test(err.message)) throw new ProviderError("provider_error", "Provider account has no credit left");
-      if (err instanceof Anthropic.InternalServerError) throw new ProviderError("provider_error", `Provider is unavailable (HTTP ${err.status})`);
-      if (err instanceof Anthropic.APIError) throw new ProviderError("provider_error", `Provider returned HTTP ${err.status ?? "error"}`);
-      throw new ProviderError("provider_error", "Unknown provider error");
+      if (signal.aborted) throw new ProviderError("timeout", "Ajan süre sınırı içinde yanıt gelmedi");
+      if (err instanceof Anthropic.APIUserAbortError) throw new ProviderError("timeout", "İstek iptal edildi");
+      if (err instanceof Anthropic.AuthenticationError) throw new ProviderError("provider_error", "Sağlayıcı API anahtarını reddetti (ANTHROPIC_API_KEY geçersiz)");
+      if (err instanceof Anthropic.RateLimitError) throw new ProviderError("provider_error", "Sağlayıcı hız sınırı doldu");
+      if (err instanceof Anthropic.APIConnectionTimeoutError) throw new ProviderError("timeout", "Sağlayıcı bağlantısı zaman aşımına uğradı");
+      if (err instanceof Anthropic.APIConnectionError) throw new ProviderError("provider_error", "Sağlayıcıya ulaşılamadı");
+      if (err instanceof Anthropic.PermissionDeniedError) throw new ProviderError("provider_error", "Sağlayıcı bu anahtara erişim izni vermedi");
+      if (err instanceof Anthropic.NotFoundError) throw new ProviderError("provider_error", `${this.model} modeli bu anahtar için kullanılamıyor`);
+      if (err instanceof Anthropic.BadRequestError && /credit balance/i.test(err.message)) throw new ProviderError("provider_error", "Sağlayıcı hesabında kredi kalmadı");
+      if (err instanceof Anthropic.InternalServerError) throw new ProviderError("provider_error", `Sağlayıcı kullanılamıyor (HTTP ${err.status})`);
+      if (err instanceof Anthropic.APIError) throw new ProviderError("provider_error", `Sağlayıcı HTTP ${err.status ?? "hatası"} döndürdü`);
+      throw new ProviderError("provider_error", "Bilinmeyen sağlayıcı hatası");
     }
 
-    if (message.stop_reason === "refusal") throw new ProviderError("refusal", "The model declined to answer", message.model);
-    if (message.stop_reason === "max_tokens") throw new ProviderError("truncated", "The model output hit the token limit", message.model);
+    if (message.stop_reason === "refusal") throw new ProviderError("refusal", "Model yanıt vermeyi reddetti", message.model);
+    if (message.stop_reason === "max_tokens") throw new ProviderError("truncated", "Model çıktısı token sınırına ulaştı", message.model);
 
     return {
       provider: this.id,

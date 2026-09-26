@@ -3,15 +3,15 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/layout";
 import { DOCS } from "@/lib/docs";
 
-export const metadata: Metadata = { title: "Documentation" };
+export const metadata: Metadata = { title: "Belgeler" };
 
 export default function DocsIndexPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Documentation"
-        title="Technical documentation"
-        lead="The same documents that define the implementation. Where code and documentation disagree, the documentation is updated with the change."
+        eyebrow="Belgeler"
+        title="Teknik belgeler"
+        lead="Uygulamayı tanımlayan belgelerin kendisi. Kod ile belge çeliştiğinde belge de değişiklikle birlikte güncellenir. (Belgeler İngilizcedir.)"
       />
       <ol className="border border-rule bg-surface">
         {DOCS.map((d, i) => (

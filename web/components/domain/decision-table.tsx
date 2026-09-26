@@ -13,14 +13,14 @@ export function statusTone(s: Status): Tone {
 
 export function DecisionTable({ rows }: { rows: DecisionSummary[] }) {
   return (
-    <Table caption="Decisions">
+    <Table caption="Kararlar">
       <thead>
         <tr>
           <Th>ID</Th>
-          <Th>Status</Th>
-          <Th>State hash</Th>
-          <Th align="right">Participants</Th>
-          <Th>Created</Th>
+          <Th>Durum</Th>
+          <Th>Durum hash&apos;i</Th>
+          <Th align="right">Katılımcı</Th>
+          <Th>Oluşturulma</Th>
         </tr>
       </thead>
       <tbody>

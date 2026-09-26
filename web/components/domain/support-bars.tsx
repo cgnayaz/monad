@@ -26,7 +26,7 @@ export function SupportBars({ support, total, thresholdBps }: { support: bigint[
       </ul>
       <p className="mt-3 text-[12px] text-ink-2">
         <span className="mr-2 inline-block h-2.5 w-px translate-y-0.5 bg-accent" aria-hidden />
-        Threshold {threshold.toFixed(2)} % of total weighted support ({total.toString()}).
+        Eşik: toplam ağırlıklı desteğin %{threshold.toFixed(2)}&apos;i ({total.toString()}).
       </p>
     </div>
   );

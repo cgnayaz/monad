@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
   if (body.data.mode === "live") {
     const op = operatorFromCookie((await cookies()).get(SESSION_COOKIE)?.value);
-    if (!op) return Response.json({ error: "Live rounds require an operator session: sign in with the admin or guardian wallet" }, { status: 401 });
+    if (!op) return Response.json({ error: "Canlı turlar operatör oturumu gerektirir: admin veya guardian cüzdanıyla giriş yapın" }, { status: 401 });
   } else {
     const rl = rateLimit(`simulation:${clientKey(req)}`, 3, 10 * 60_000);
     if (!rl.ok) return tooMany(rl.retryAfterSec);

@@ -60,18 +60,25 @@ export class GeminiProvider implements DecisionProvider {
         systemInstruction: systemPrompt(req),
         responseMimeType: "application/json",
         responseJsonSchema: RESPONSE_SCHEMA,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        // thinkingLevel exists from Gemini 3 on; older models (set via AI_MODEL) reject it.
+        ...(supportsThinkingLevel(model) ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
         maxOutputTokens: 16_000,
         abortSignal: signal,
       },
     });
     const answeredBy = res.modelVersion ?? model;
-    if (res.promptFeedback?.blockReason) throw new ProviderError("refusal", `The model declined to answer (${res.promptFeedback.blockReason})`, answeredBy);
+    if (res.promptFeedback?.blockReason) throw new ProviderError("refusal", `Model yanıt vermeyi reddetti (${res.promptFeedback.blockReason})`, answeredBy);
     const finish = res.candidates?.[0]?.finishReason;
-    if (finish === FinishReason.MAX_TOKENS) throw new ProviderError("truncated", "The model output hit the token limit", answeredBy);
-    if (finish && finish !== FinishReason.STOP) throw new ProviderError("refusal", `The model stopped without an answer (${finish})`, answeredBy);
+    if (finish === FinishReason.MAX_TOKENS) throw new ProviderError("truncated", "Model çıktısı token sınırına ulaştı", answeredBy);
+    if (finish && finish !== FinishReason.STOP) throw new ProviderError("refusal", `Model yanıt vermeden durdu (${finish})`, answeredBy);
     return { provider: this.id, model: answeredBy, rawText: res.text ?? "", latencyMs: Date.now() - started };
   }
+}
+
+/** Gemini 3 and later accept thinkingConfig.thinkingLevel; unknown ids are assumed current. */
+export function supportsThinkingLevel(model: string): boolean {
+  const m = /^(?:models\/)?gemini-(\d+)/.exec(model);
+  return !m || Number(m[1]) >= 3;
 }
 
 function backoff(ms: number, signal: AbortSignal): Promise<void> {
@@ -83,16 +90,17 @@ function backoff(ms: number, signal: AbortSignal): Promise<void> {
 
 function classify(err: unknown, signal: AbortSignal, model: string): ProviderError {
   if (err instanceof ProviderError) return err;
-  if (signal.aborted) return new ProviderError("timeout", "No response within the agent time limit");
+  if (signal.aborted) return new ProviderError("timeout", "Ajan süre sınırı içinde yanıt gelmedi");
   if (err instanceof ApiError) {
-    if (err.status === 400 && /api key/i.test(err.message)) return new ProviderError("provider_error", "Provider rejected credentials");
-    if (err.status === 401 || err.status === 403) return new ProviderError("provider_error", "Provider denied access for this key");
-    if (err.status === 404) return new ProviderError("provider_error", `Model ${model} is not available for this key`);
-    if (err.status === 429) return new ProviderError("provider_error", "Provider quota or rate limit reached");
-    if (err.status >= 500) return new ProviderError("provider_error", `Provider is unavailable (HTTP ${err.status})`);
-    return new ProviderError("provider_error", `Provider returned HTTP ${err.status}`);
+    if (err.status === 400 && /api key/i.test(err.message)) return new ProviderError("provider_error", "Sağlayıcı API anahtarını reddetti (GEMINI_API_KEY geçersiz)");
+    if (err.status === 400 && /location is not supported/i.test(err.message)) return new ProviderError("provider_error", "Gemini API bu sunucu bölgesinde kullanılamıyor");
+    if (err.status === 401 || err.status === 403) return new ProviderError("provider_error", "Sağlayıcı bu anahtara erişim izni vermedi");
+    if (err.status === 404) return new ProviderError("provider_error", `${model} modeli bu anahtar için kullanılamıyor`);
+    if (err.status === 429) return new ProviderError("provider_error", "Sağlayıcı kotası veya hız sınırı doldu");
+    if (err.status >= 500) return new ProviderError("provider_error", `Sağlayıcı kullanılamıyor (HTTP ${err.status})`);
+    return new ProviderError("provider_error", `Sağlayıcı HTTP ${err.status} döndürdü`);
   }
-  if (err instanceof Error && err.name === "AbortError") return new ProviderError("timeout", "Request aborted");
-  if (err instanceof TypeError && /fetch/i.test(err.message)) return new ProviderError("provider_error", "Could not reach the provider");
-  return new ProviderError("provider_error", "Unknown provider error");
+  if (err instanceof Error && err.name === "AbortError") return new ProviderError("timeout", "İstek iptal edildi");
+  if (err instanceof TypeError && /fetch/i.test(err.message)) return new ProviderError("provider_error", "Sağlayıcıya ulaşılamadı");
+  return new ProviderError("provider_error", "Bilinmeyen sağlayıcı hatası");
 }

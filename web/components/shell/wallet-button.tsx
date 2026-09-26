@@ -51,11 +51,11 @@ export function WalletButton() {
             if (injected) connect({ connector: injected, chainId: monadTestnet.id });
           }}
         >
-          {isPending ? "Connecting…" : "Connect wallet"}
+          {isPending ? "Bağlanıyor…" : "Cüzdan bağla"}
         </button>
         {err && (
           <p role="alert" className="absolute right-0 top-10 z-20 w-64 border border-fail bg-surface px-3 py-2 text-[12px] text-fail">
-            {err.kind === "rejected" ? "Connection rejected in the wallet." : err.message}
+            {err.kind === "rejected" ? "Bağlantı cüzdanda reddedildi." : err.message}
           </p>
         )}
       </div>
@@ -74,14 +74,14 @@ export function WalletButton() {
         className={`${base} inline-flex items-center gap-2 font-mono ${wrongNetwork ? "border-wait text-wait" : "border-rule text-ink-2 hover:border-ink"}`}
       >
         <span aria-hidden className={`inline-block h-1.5 w-1.5 ${wrongNetwork ? "bg-wait" : "bg-pass"}`} />
-        {wrongNetwork ? "Wrong network" : shortHex(address, 4, 4)}
+        {wrongNetwork ? "Yanlış ağ" : shortHex(address, 4, 4)}
       </button>
 
       {open && (
         <div className="absolute right-0 top-10 z-30 w-[300px] border border-rule bg-surface text-[12.5px] shadow-[0_1px_0_var(--rule)]">
           <dl className="divide-y divide-rule">
             <div className="px-4 py-2.5">
-              <dt className="label">Address</dt>
+              <dt className="label">Adres</dt>
               <dd className="mt-0.5 break-all font-mono">
                 <a href={explorer.address(address)} target="_blank" rel="noreferrer" className="underline decoration-rule underline-offset-2 hover:decoration-ink">
                   {address}
@@ -89,25 +89,25 @@ export function WalletButton() {
               </dd>
             </div>
             <div className="px-4 py-2.5">
-              <dt className="label">Network</dt>
+              <dt className="label">Ağ</dt>
               <dd className="mt-0.5 flex items-center justify-between gap-2">
-                {wrongNetwork ? <StatusMark tone="wait">chain {chainId ?? "unknown"}</StatusMark> : <StatusMark tone="pass">Monad Testnet · {monadTestnet.id}</StatusMark>}
+                {wrongNetwork ? <StatusMark tone="wait">zincir {chainId ?? "bilinmiyor"}</StatusMark> : <StatusMark tone="pass">Monad Testnet · {monadTestnet.id}</StatusMark>}
                 {wrongNetwork && (
                   <button type="button" onClick={() => switchChain({ chainId: monadTestnet.id })} disabled={switching} className="text-[12px] text-ink underline decoration-rule underline-offset-2 hover:decoration-ink">
-                    {switching ? "Switching…" : "Switch"}
+                    {switching ? "Geçiliyor…" : "Ağı değiştir"}
                   </button>
                 )}
               </dd>
               {switchError && <p className="mt-1 text-[11.5px] text-fail">{classifyTxError(switchError).message}</p>}
             </div>
             <div className="px-4 py-2.5">
-              <dt className="label">Balance</dt>
+              <dt className="label">Bakiye</dt>
               <dd className="mt-0.5 font-mono">
-                {balance.isError ? <span className="text-fail">RPC unavailable</span> : mon === null ? <span className="text-ink-3">reading…</span> : `${mon} MON`}
+                {balance.isError ? <span className="text-fail">RPC kullanılamıyor</span> : mon === null ? <span className="text-ink-3">okunuyor…</span> : `${mon} MON`}
               </dd>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5">
-              <span className="text-ink-3">{connector?.name ?? "wallet"}</span>
+              <span className="text-ink-3">{connector?.name ?? "cüzdan"}</span>
               <button
                 type="button"
                 onClick={() => {
@@ -116,7 +116,7 @@ export function WalletButton() {
                 }}
                 className="text-[12px] text-ink underline decoration-rule underline-offset-2 hover:decoration-ink"
               >
-                Disconnect
+                Bağlantıyı kes
               </button>
             </div>
           </dl>

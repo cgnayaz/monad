@@ -12,15 +12,15 @@ function formatValue(i: StateInput): string {
 /** Every Jev state input with its source and status. Unavailable inputs stay visible with a reason. */
 export function StateTable({ inputs }: { inputs: StateInput[] }) {
   return (
-    <Table caption="Jev state inputs">
+    <Table caption="Jev durum girdileri">
       <thead>
         <tr>
-          <Th>Input</Th>
-          <Th align="right">Value</Th>
-          <Th>Unit</Th>
-          <Th>Source</Th>
-          <Th>Reference</Th>
-          <Th>Status</Th>
+          <Th>Girdi</Th>
+          <Th align="right">Değer</Th>
+          <Th>Birim</Th>
+          <Th>Kaynak</Th>
+          <Th>Referans</Th>
+          <Th>Durum</Th>
         </tr>
       </thead>
       <tbody>
@@ -37,10 +37,10 @@ export function StateTable({ inputs }: { inputs: StateInput[] }) {
             </Td>
             <Td>
               {i.status === "ok" ? (
-                <StatusMark tone="pass">ok</StatusMark>
+                <StatusMark tone="pass">tamam</StatusMark>
               ) : (
                 <span className="flex flex-col gap-0.5">
-                  <StatusMark tone={i.status === "stale" ? "wait" : "neutral"}>{i.status}</StatusMark>
+                  <StatusMark tone={i.status === "stale" ? "wait" : "neutral"}>{i.status === "stale" ? "eski" : "yok"}</StatusMark>
                   {i.note && <span className="text-[12px] text-ink-3">{i.note}</span>}
                 </span>
               )}

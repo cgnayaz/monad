@@ -6,20 +6,20 @@
 type Layer = "Jev" | "DecMarkt" | "Monad";
 
 export const PIPELINE: { stage: string; layer: Layer; where: string; detail: string }[] = [
-  { stage: "Real state", layer: "Jev", where: "collectors", detail: "Pyth reference price (ETH/USD), Monad RPC, vault and registry views." },
-  { stage: "Jev state", layer: "Jev", where: "lib/jev/state", detail: "Canonical JSON (RFC 8785), versioned, every input sourced; keccak256 → stateHash." },
-  { stage: "Jev questions", layer: "Jev", where: "lib/jev/questions", detail: "Six explicit questions with rubrics; keccak256 → questionsHash." },
-  { stage: "Commit", layer: "Monad", where: "DecisionRegistry", detail: "stateHash and questionsHash written on-chain before any agent runs." },
-  { stage: "Parallel decisions", layer: "Jev", where: "lib/jev/parallel", detail: "Five isolated agent runs over the same state and questions." },
-  { stage: "Choice · Score · Probability", layer: "Jev", where: "lib/jev/primitives", detail: "Validated output; score computed from rubric ratings, never by the model." },
-  { stage: "Batch", layer: "Jev", where: "lib/jev/batch", detail: "All of an agent's answers form one batch; every (agent, question) answer keeps its own record." },
-  { stage: "Bonded submission", layer: "DecMarkt", where: "DecisionRegistry.submitBatch", detail: "Each agent's operator key submits its batch against its locked bond; invalid choices, scores and probabilities revert." },
-  { stage: "Decision engine", layer: "DecMarkt", where: "DecisionEngine.aggregate", detail: "Integer aggregation: probability × track record per fork." },
-  { stage: "Threshold", layer: "DecMarkt", where: "DecisionEngine", detail: "Quorum, winning share and minimum score gates; failure → NO_ACTION." },
-  { stage: "Bounded action", layer: "Monad", where: "ExecutionVault.execute", detail: "Only the approved fork runs. No external calls, no AI calldata." },
-  { stage: "Real outcome", layer: "Monad", where: "Pyth", detail: "Signed Pyth price at execution and after the horizon." },
-  { stage: "Verify", layer: "Monad", where: "OutcomeRegistry.resolve", detail: "Publish-time window enforced; correct fork derived from the move." },
-  { stage: "Reward / penalty", layer: "DecMarkt", where: "OutcomeRegistry", detail: "Deterministic settlement of every bond. Agents have no input." },
+  { stage: "Gerçek durum", layer: "Jev", where: "collectors", detail: "Pyth referans fiyatı (ETH/USD), Monad RPC, kasa ve kayıt defteri görünümleri." },
+  { stage: "Jev durumu", layer: "Jev", where: "lib/jev/state", detail: "Kanonik JSON (RFC 8785), sürümlü, her girdinin kaynağı belli; keccak256 → stateHash." },
+  { stage: "Jev soruları", layer: "Jev", where: "lib/jev/questions", detail: "Rubrikli altı açık soru; keccak256 → questionsHash." },
+  { stage: "Taahhüt", layer: "Monad", where: "DecisionRegistry", detail: "stateHash ve questionsHash, hiçbir ajan çalışmadan önce zincire yazılır." },
+  { stage: "Paralel kararlar", layer: "Jev", where: "lib/jev/parallel", detail: "Aynı durum ve sorular üzerinde beş yalıtılmış ajan çalıştırması." },
+  { stage: "Seçim · Skor · Olasılık", layer: "Jev", where: "lib/jev/primitives", detail: "Doğrulanmış çıktı; skor rubrik puanlarından hesaplanır, asla model tarafından verilmez." },
+  { stage: "Toplu gönderim", layer: "Jev", where: "lib/jev/batch", detail: "Bir ajanın tüm yanıtları tek bir toplu gönderim oluşturur; her (ajan, soru) yanıtı kendi kaydını korur." },
+  { stage: "Teminatlı gönderim", layer: "DecMarkt", where: "DecisionRegistry.submitBatch", detail: "Her ajanın operatör anahtarı, kilitli teminatına karşı toplu gönderimini yapar; geçersiz seçim, skor ve olasılıklar revert eder." },
+  { stage: "Karar motoru", layer: "DecMarkt", where: "DecisionEngine.aggregate", detail: "Tamsayı toplama: her çatal için olasılık × geçmiş başarı." },
+  { stage: "Eşik", layer: "DecMarkt", where: "DecisionEngine", detail: "Yeter sayı, kazanan pay ve asgari skor kapıları; başarısızlık → NO_ACTION." },
+  { stage: "Sınırlı eylem", layer: "Monad", where: "ExecutionVault.execute", detail: "Yalnızca onaylanan çatal çalışır. Dış çağrı yok, AI calldata'sı yok." },
+  { stage: "Gerçek sonuç", layer: "Monad", where: "Pyth", detail: "Yürütmede ve ufuktan sonra imzalı Pyth fiyatı." },
+  { stage: "Doğrulama", layer: "Monad", where: "OutcomeRegistry.resolve", detail: "Yayın zamanı penceresi uygulanır; doğru çatal hareketten türetilir." },
+  { stage: "Ödül / ceza", layer: "DecMarkt", where: "OutcomeRegistry", detail: "Her teminatın deterministik uzlaşması. Ajanların etkisi yoktur." },
 ];
 
 const layerStyle: Record<Layer, string> = {

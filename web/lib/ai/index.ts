@@ -1,5 +1,5 @@
 import "server-only";
-import { serverEnv } from "@/lib/config/server";
+import { invalidEnvVars, serverEnv } from "@/lib/config/server";
 import { unavailable, ok, type Availability } from "@/lib/types/protocol";
 import { AnthropicProvider } from "./anthropic";
 import { GeminiProvider } from "./gemini";
@@ -17,7 +17,8 @@ type ProviderId = keyof typeof DEFAULTS;
 /** The configured provider and model, without constructing a client. Never exposes key values. */
 export function providerConfig(): { provider: ProviderId; model: string; fallback: readonly string[]; key: string | undefined; keyEnv: string } {
   const env = serverEnv();
-  const provider: ProviderId = env.AI_PROVIDER ?? (env.GEMINI_API_KEY ? "gemini" : "anthropic");
+  // Gemini is the default; Anthropic only when explicitly selected or when it is the only key present.
+  const provider: ProviderId = env.AI_PROVIDER ?? (!env.GEMINI_API_KEY && env.ANTHROPIC_API_KEY ? "anthropic" : "gemini");
   const d = DEFAULTS[provider];
   return {
     provider,
@@ -31,7 +32,7 @@ export function providerConfig(): { provider: ProviderId; model: string; fallbac
 /** Resolve the configured provider, or report exactly why none is available. */
 export function getDecisionProvider(): Availability<DecisionProvider> {
   const c = providerConfig();
-  if (!c.key) return unavailable(`${c.keyEnv} is not configured on the server`);
+  if (!c.key) return unavailable(missingKeyReason(c.keyEnv));
   return ok(c.provider === "gemini" ? new GeminiProvider(c.key, c.model, c.fallback) : new AnthropicProvider(c.key, c.model));
 }
 
@@ -39,5 +40,12 @@ export function providerStatus(): { configured: boolean; provider: string; model
   const c = providerConfig();
   return c.key
     ? { configured: true, provider: c.provider, model: c.model }
-    : { configured: false, provider: c.provider, model: null, reason: `${c.keyEnv} is not configured` };
+    : { configured: false, provider: c.provider, model: null, reason: missingKeyReason(c.keyEnv) };
+}
+
+function missingKeyReason(keyEnv: string): string {
+  const invalid = invalidEnvVars().filter((v) => v === "AI_PROVIDER" || v.endsWith("_API_KEY"));
+  return invalid.length
+    ? `${keyEnv} sunucuda yapılandırılmamış (geçersiz değer yok sayıldı: ${invalid.join(", ")})`
+    : `${keyEnv} sunucuda yapılandırılmamış`;
 }

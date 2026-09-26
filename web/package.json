@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "gemini:check": "node --env-file-if-exists=.env.local scripts/gemini-check.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

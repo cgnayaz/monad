@@ -41,27 +41,27 @@ export function classifyTxError(err: unknown): TxError {
       const args = reverted.data?.args?.length ? `(${reverted.data.args.map(String).join(", ")})` : "";
       return {
         kind: "revert",
-        message: name ? `The contract rejected the call: ${name}${args}` : `The contract reverted${reverted.reason ? `: ${reverted.reason}` : ""}`,
+        message: name ? `Kontrat çağrıyı reddetti: ${name}${args}` : `Kontrat revert etti${reverted.reason ? `: ${reverted.reason}` : ""}`,
         detail,
         revertName: name,
       };
     }
     if (err.walk((e) => e instanceof UserRejectedRequestError) || /user rejected|user denied|rejected the request/i.test(detail)) {
-      return { kind: "rejected", message: "The request was rejected in the wallet.", detail };
+      return { kind: "rejected", message: "İstek cüzdanda reddedildi.", detail };
     }
     if (err.walk((e) => e instanceof InsufficientFundsError) || /insufficient funds/i.test(detail)) {
-      return { kind: "insufficient-balance", message: "The wallet does not hold enough MON for this transaction and its gas.", detail };
+      return { kind: "insufficient-balance", message: "Cüzdanda bu işlem ve gas için yeterli MON yok.", detail };
     }
     if (err.walk((e) => e instanceof ChainMismatchError)) {
-      return { kind: "wrong-network", message: "The wallet is connected to a different network. Switch to Monad Testnet.", detail };
+      return { kind: "wrong-network", message: "Cüzdan farklı bir ağa bağlı. Monad Testnet'e geçin.", detail };
     }
     if (err.walk((e) => e instanceof HttpRequestError || e instanceof TimeoutError || e instanceof RpcRequestError)) {
-      return { kind: "rpc", message: "The Monad RPC did not respond correctly. Try again.", detail };
+      return { kind: "rpc", message: "Monad RPC doğru yanıt vermedi. Tekrar deneyin.", detail };
     }
   }
   if (/connector not (found|connected)|provider not found|no injected/i.test(detail)) {
-    return { kind: "no-wallet", message: "No browser wallet was found. Install or unlock MetaMask.", detail };
+    return { kind: "no-wallet", message: "Tarayıcı cüzdanı bulunamadı. MetaMask'ı kurun veya kilidini açın.", detail };
   }
-  if (/4001|user rejected/i.test(detail)) return { kind: "rejected", message: "The request was rejected in the wallet.", detail };
-  return { kind: "unknown", message: detail || "Unknown error", detail };
+  if (/4001|user rejected/i.test(detail)) return { kind: "rejected", message: "İstek cüzdanda reddedildi.", detail };
+  return { kind: "unknown", message: detail || "Bilinmeyen hata", detail };
 }
