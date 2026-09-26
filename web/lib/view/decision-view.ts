@@ -1,5 +1,6 @@
 import type { Wire } from "@/lib/engine/wire";
 import { formatPrice, formatUtc } from "@/lib/format";
+import { AGENT_TR, FORK_TR, agentName, questionText } from "@/lib/i18n";
 import { AGENTS } from "@/lib/jev/agents";
 import type { IntegrityCheck } from "@/lib/jev/verify";
 import { ACTION_SPACE } from "@/lib/model/action";
@@ -160,20 +161,20 @@ export interface DecisionView {
 }
 
 const FAILURE_LABEL: Record<AgentFailureKind, string> = {
-  timeout: "Timeout",
-  provider_error: "Provider error",
-  invalid_json: "Invalid JSON",
-  schema_violation: "Schema violation",
-  refusal: "Refused",
-  truncated: "Truncated",
+  timeout: "Zaman aşımı",
+  provider_error: "Sağlayıcı hatası",
+  invalid_json: "Geçersiz JSON",
+  schema_violation: "Şema ihlali",
+  refusal: "Reddedildi",
+  truncated: "Kesildi",
 };
 
 export const DOMAIN_LABEL: Record<string, string> = {
-  RISK: "Downside risk",
-  YIELD: "Opportunity",
-  SECURITY: "Operational security",
-  MARKET: "Market signal",
-  HISTORY: "Historical record",
+  RISK: "Aşağı yönlü risk",
+  YIELD: "Fırsat",
+  SECURITY: "Operasyonel güvenlik",
+  MARKET: "Piyasa sinyali",
+  HISTORY: "Geçmiş kayıt",
 };
 
 const tx = (t: Wire<TxRef> | TxRef | null | undefined): TxView | null =>
@@ -184,10 +185,10 @@ function questionItems(set: Wire<QuestionSet> | QuestionSet): QuestionItem[] {
     questionId: q.questionId,
     index: q.index,
     category: q.category,
-    text: q.text,
+    text: questionText(q.category, q.text),
     inputs: q.inputs?.length ?? 0,
     availableInputs: q.availableInputs ?? 0,
-    answeredBy: AGENTS.filter((a) => set.assignment[a.key]?.includes(q.questionId)).map((a) => a.name),
+    answeredBy: AGENTS.filter((a) => set.assignment[a.key]?.includes(q.questionId)).map((a) => agentName(a.key, a.name)),
   }));
 }
 
@@ -234,9 +235,9 @@ function baseAgent(spec: (typeof AGENTS)[number]): AgentModuleView {
   return {
     agentId: spec.agentId,
     key: spec.key,
-    name: spec.name,
+    name: agentName(spec.key, spec.name),
     domain: DOMAIN_LABEL[spec.key],
-    mandate: spec.mandate,
+    mandate: AGENT_TR[spec.key]?.mandate ?? spec.mandate,
     status: "pending",
     failure: null,
     choice: null,
@@ -255,7 +256,7 @@ function baseAgent(spec: (typeof AGENTS)[number]): AgentModuleView {
 function actionBlock(a: { fork: Fork; approvedBy: string } | null | undefined): DecisionView["action"] {
   if (!a) return null;
   const def = ACTION_SPACE[a.fork];
-  return { fork: a.fork, alias: def.alias, label: def.label, effect: def.effect, approvedBy: a.approvedBy };
+  return { fork: a.fork, alias: def.alias, label: FORK_TR[a.fork].label, effect: FORK_TR[a.fork].effect, approvedBy: a.approvedBy };
 }
 
 function stages(v: Omit<DecisionView, "stages">, running: Partial<Record<PipelineStage, StageStatus>> = {}): JevStage[] {
@@ -267,52 +268,52 @@ function stages(v: Omit<DecisionView, "stages">, running: Partial<Record<Pipelin
   return [
     {
       key: "STATE",
-      label: "State",
+      label: "Durum",
       state: v.state.hash ? "done" : running.STATE === "running" ? "active" : "pending",
       primary: v.state.stateId ?? (v.state.hash ? `${v.state.hash.slice(0, 10)}…` : "—"),
-      secondary: v.state.total !== null ? `${v.state.available}/${v.state.total} inputs available` : v.state.hash ? "hash committed on-chain" : undefined,
+      secondary: v.state.total !== null ? `${v.state.available}/${v.state.total} girdi mevcut` : v.state.hash ? "hash zincire işlendi" : undefined,
     },
     {
       key: "QUESTIONS",
-      label: "Questions",
+      label: "Sorular",
       state: v.questions.items || v.questions.hash ? "done" : running.QUESTIONS === "running" ? "active" : "pending",
-      primary: v.questions.items ? `${v.questions.items.length} questions` : v.questions.hash ? "hash committed" : "—",
+      primary: v.questions.items ? `${v.questions.items.length} soru` : v.questions.hash ? "hash işlendi" : "—",
       secondary: v.questions.hash ? `${v.questions.hash.slice(0, 10)}…` : undefined,
     },
     {
       key: "PARALLEL",
-      label: "Parallel decisions",
+      label: "Paralel kararlar",
       state: processing ? "active" : ok + failed === 0 ? "pending" : failed > 0 && ok === 0 ? "failed" : "done",
-      primary: ok + failed === 0 ? (processing ? "agents evaluating" : "—") : `${ok}/${v.agents.length} valid`,
-      secondary: failed > 0 ? `${failed} failed or missed` : processing ? `${v.agents.filter((a) => a.status === "processing").length} in progress` : undefined,
+      primary: ok + failed === 0 ? (processing ? "ajanlar değerlendiriyor" : "—") : `${ok}/${v.agents.length} geçerli`,
+      secondary: failed > 0 ? `${failed} başarısız veya kaçırıldı` : processing ? `${v.agents.filter((a) => a.status === "processing").length} devam ediyor` : undefined,
     },
     {
       key: "PRIMITIVES",
-      label: "Choice · Score · Probability",
+      label: "Seçim · Skor · Olasılık",
       state: g ? "done" : running.AGGREGATION === "running" ? "active" : "pending",
       primary: g ? g.leading : "—",
-      secondary: g ? `score ${g.aggregateScore ?? "—"} · p ${pct(g.aggregateProbability)} · share ${pct(g.supportShareBps)}` : undefined,
+      secondary: g ? `skor ${g.aggregateScore ?? "—"} · p ${pct(g.aggregateProbability)} · pay ${pct(g.supportShareBps)}` : undefined,
     },
     {
       key: "ACTION",
-      label: "Bounded action",
+      label: "Sınırlı eylem",
       state: v.action ? "done" : g?.guardianRequired ? "active" : "pending",
-      primary: v.action ? v.action.fork : g?.guardianRequired ? "awaiting guardian" : "—",
-      secondary: v.action ? `${v.action.alias} · ${v.action.approvedBy}` : g ? `threshold ${g.passed ? "passed" : "not met"}` : undefined,
+      primary: v.action ? v.action.fork : g?.guardianRequired ? "guardian bekleniyor" : "—",
+      secondary: v.action ? `${v.action.alias} · ${v.action.approvedBy}` : g ? `eşik ${g.passed ? "geçti" : "sağlanmadı"}` : undefined,
     },
     {
       key: "VERIFY",
-      label: "Verify",
+      label: "Doğrulama",
       state: v.outcome.status === "verified" || v.outcome.status === "void" ? "done" : v.outcome.status === "na" ? "na" : v.execution.status === "executed" ? "active" : "pending",
       primary:
         v.outcome.status === "verified"
-          ? `${v.outcome.observed} · ${v.outcome.success ? "success" : "miss"}`
+          ? `${v.outcome.observed} · ${v.outcome.success ? "başarılı" : "isabetsiz"}`
           : v.outcome.status === "void"
-            ? "void"
+            ? "geçersiz"
             : v.outcome.status === "na"
-              ? "not applicable"
+              ? "uygulanamaz"
               : v.execution.status === "executed"
-                ? "after horizon"
+                ? "ufuktan sonra"
                 : "—",
       secondary: v.outcome.detail,
     },
@@ -396,7 +397,7 @@ export function fromRound(p: RoundProgress): DecisionView {
     outcome: live
       ? {
           status: "pending",
-          detail: ex?.status === "submitted" && ex.next?.step === "resolve" && ex.next.availableAt ? `verifiable after ${formatUtc(ex.next.availableAt)}` : "after execution and horizon",
+          detail: ex?.status === "submitted" && ex.next?.step === "resolve" && ex.next.availableAt ? `doğrulanabilir: ${formatUtc(ex.next.availableAt)} sonrası` : "yürütme ve ufuktan sonra",
           expectedAction: null,
           observed: null,
           success: null,
@@ -408,10 +409,10 @@ export function fromRound(p: RoundProgress): DecisionView {
           availableAt: ex?.status === "submitted" && ex.next?.step === "resolve" ? ex.next.availableAt : null,
           bandBps: d?.parameters.bandBps ?? null,
         }
-      : { status: "na", detail: d ? "simulation: no transaction is sent" : "—", expectedAction: null, observed: null, success: null, moveBps: null, startPrice: null, endPrice: null, source: null, resolvedAt: null, availableAt: null, bandBps: null },
+      : { status: "na", detail: d ? "simülasyon: hiçbir işlem gönderilmez" : "—", expectedAction: null, observed: null, success: null, moveBps: null, startPrice: null, endPrice: null, source: null, resolvedAt: null, availableAt: null, bandBps: null },
     settlement: live
-      ? { status: "LOCKED", detail: "bonds locked until the outcome is verified", lines: [], reproduction: null }
-      : { status: "na", detail: d ? "no bonds in simulation" : "—", lines: [], reproduction: null },
+      ? { status: "LOCKED", detail: "teminatlar sonuç doğrulanana kadar kilitli", lines: [], reproduction: null }
+      : { status: "na", detail: d ? "simülasyonda teminat yok" : "—", lines: [], reproduction: null },
     transitions: [],
     integrity: [],
     payloads: d?.payloads.detail ?? null,
@@ -502,7 +503,7 @@ export function fromProvenance(
     execution: e
       ? {
           status: "executed",
-          detail: `${p.action!.fork} executed`,
+          detail: `${p.action!.fork} yürütüldü`,
           amountMoved: String(e.amountMoved),
           after: { active: String(e.after.active), reserve: String(e.after.reserve) },
           startPrice: formatPrice(e.startPrice.price, e.startPrice.expo),
@@ -512,7 +513,7 @@ export function fromProvenance(
         }
       : {
           status: d.status === "CANCELLED" ? "none" : "awaiting",
-          detail: d.status === "CANCELLED" ? "cancelled before execution" : p.action ? "approved; awaiting execution" : "awaiting approval",
+          detail: d.status === "CANCELLED" ? "yürütmeden önce iptal edildi" : p.action ? "onaylandı; yürütme bekleniyor" : "onay bekleniyor",
           amountMoved: null,
           after: null,
           startPrice: null,
@@ -523,7 +524,7 @@ export function fromProvenance(
     outcome: o
       ? {
           status: o.status === "VOID" ? "void" : "verified",
-          detail: o.status === "VOID" ? "no valid oracle update inside the window; bonds returned" : `move ${o.observedResult?.moveBps} bps vs band ±${d.config.bandBps}`,
+          detail: o.status === "VOID" ? "pencere içinde geçerli oracle güncellemesi yok; teminatlar iade edildi" : `hareket ${o.observedResult?.moveBps} bps, bant ±${d.config.bandBps}`,
           expectedAction: o.expectedAction,
           observed: o.observedResult?.correctFork ?? null,
           success: o.success,
@@ -534,13 +535,13 @@ export function fromProvenance(
           bandBps: d.config.bandBps,
           source:
             o.verificationSource.kind === "pyth"
-              ? `Pyth ${o.verificationSource.contract} · feed ${o.verificationSource.feedId.slice(0, 10)}… · publish window ${formatUtc(o.verificationSource.window.from)} + ${o.verificationSource.window.to - o.verificationSource.window.from} s`
-              : "simulation",
+              ? `Pyth ${o.verificationSource.contract} · feed ${o.verificationSource.feedId.slice(0, 10)}… · yayın penceresi ${formatUtc(o.verificationSource.window.from)} + ${o.verificationSource.window.to - o.verificationSource.window.from} s`
+              : "simülasyon",
           resolvedAt: o.timestamp,
         }
       : {
           status: d.status === "CANCELLED" ? "na" : "pending",
-          detail: d.status === "CANCELLED" ? "cancelled" : e ? `verifiable after ${formatUtc(e.executedAt + d.config.horizon)}` : "after execution",
+          detail: d.status === "CANCELLED" ? "iptal edildi" : e ? `doğrulanabilir: ${formatUtc(e.executedAt + d.config.horizon)} sonrası` : "yürütmeden sonra",
           expectedAction: null,
           observed: null,
           success: null,
@@ -557,20 +558,20 @@ export function fromProvenance(
           status: p.settlement.settlementStatus,
           detail:
             p.settlement.settlementStatus === "SETTLED"
-              ? "rewards and penalties applied"
+              ? "ödüller ve cezalar uygulandı"
               : p.settlement.settlementStatus === "LOCKED"
-                ? "bonds locked until the outcome is verified"
+                ? "teminatlar sonuç doğrulanana kadar kilitli"
                 : p.settlement.settlementStatus === "RELEASED"
-                  ? "cancelled; bonds returned in full"
+                  ? "iptal edildi; teminatlar tamamen iade edildi"
                   : p.settlement.settlementStatus === "VOID"
-                    ? "outcome void; bonds returned in full"
-                    : "bonds not yet locked",
+                    ? "sonuç geçersiz; teminatlar tamamen iade edildi"
+                    : "teminatlar henüz kilitlenmedi",
           lines: p.settlement.lines.map((l) => {
             const f = finalSubmission(p, l.agentId);
             const rl = repro?.reproduction?.lines.find((x) => x.agentId === l.agentId);
             return {
               agentId: l.agentId,
-              name: AGENTS.find((a) => a.agentId === l.agentId)?.name ?? `Agent ${l.agentId}`,
+              name: agentName(AGENTS.find((a) => a.agentId === l.agentId)?.key ?? "", `Ajan ${l.agentId}`),
               choice: f?.choice ?? null,
               score: f?.score ?? null,
               probability: f?.probability ?? null,

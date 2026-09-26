@@ -71,13 +71,13 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
   stage("STATE", "running");
   const state = await deps.collectState();
   emit({ type: "state", state });
-  stage("STATE", "done", `${state.data.inputs.filter((i) => i.status === "ok").length}/${state.data.inputs.length} inputs available`);
+  stage("STATE", "done", `${state.data.inputs.filter((i) => i.status === "ok").length}/${state.data.inputs.length} girdi mevcut`);
 
   // QUESTIONS ────────────────────────────────────────────────────────────
   stage("QUESTIONS", "running");
   const questions = buildQuestionSet(state, now());
   emit({ type: "questions", questions });
-  stage("QUESTIONS", "done", `${questions.questions.length} questions`);
+  stage("QUESTIONS", "done", `${questions.questions.length} soru`);
 
   // COMMIT (live): hashes on-chain before any agent runs ────────────────
   let decisionId: DecisionId = SIMULATION_DECISION_ID;
@@ -92,13 +92,13 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
       participants = c.participants;
       deadline = c.deadline;
       txs.push(...c.txs);
-      stage("COMMIT", "done", `decision #${decisionId} open until ${deadline}`, c.txs);
+      stage("COMMIT", "done", `karar #${decisionId} ${deadline} tarihine kadar açık`, c.txs);
     } catch (err) {
       stage("COMMIT", "failed", errMessage(err));
       throw new Error(`Commit failed: ${errMessage(err)}`);
     }
   } else {
-    stage("COMMIT", "skipped", deps.simulationReason ?? "simulation mode");
+    stage("COMMIT", "skipped", deps.simulationReason ?? "simülasyon modu");
   }
 
   // Publish the committed state and questions so anyone can verify them against the hashes.
@@ -116,7 +116,7 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
   }
 
   // PARALLEL DECISIONS ─────────────────────────────────────────────────
-  stage("PARALLEL_DECISIONS", "running", `${deps.agents.length} agents`);
+  stage("PARALLEL_DECISIONS", "running", `${deps.agents.length} ajan`);
   const parallel = await runParallelDecisions({
     decisionId,
     state,
@@ -130,7 +130,7 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
   const runs = Object.values(parallel.runs);
   if (exec && deps.payloads) await Promise.all(runs.map((r) => publish(`run ${r.agentId}`, () => deps.payloads!.putRun(r))));
   const okRuns = runs.filter((r): r is AgentRun & { final: NonNullable<AgentRun["final"]> } => r.status === "ok" && r.final !== null);
-  stage("PARALLEL_DECISIONS", okRuns.length === runs.length ? "done" : "failed", `${okRuns.length}/${runs.length} agents produced a valid decision`);
+  stage("PARALLEL_DECISIONS", okRuns.length === runs.length ? "done" : "failed", `${okRuns.length}/${runs.length} ajan geçerli karar üretti`);
 
   // SUBMIT (live): each agent's batch from its own operator key ────────
   let counted = okRuns;
@@ -153,9 +153,9 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
       }),
     );
     counted = results.filter((r): r is (typeof okRuns)[number] => r !== null);
-    stage("SUBMIT", submissionErrors.length ? "failed" : "done", `${counted.length} batches on-chain`);
+    stage("SUBMIT", submissionErrors.length ? "failed" : "done", `${counted.length} toplu gönderim zincirde`);
   } else {
-    stage("SUBMIT", "skipped", "simulation mode");
+    stage("SUBMIT", "skipped", "simülasyon modu");
   }
 
   // AGGREGATION: deterministic, never delegated to a model ─────────────
@@ -172,17 +172,17 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
     })),
     { thresholdBps: p.thresholdBps, minActionScore: p.minActionScore, quorum: p.quorum },
   );
-  stage("AGGREGATION", "done", `leading ${aggregation.leading}, threshold ${aggregation.passed ? "passed" : "not met"}`);
+  stage("AGGREGATION", "done", `önde ${aggregation.leading}, eşik ${aggregation.passed ? "geçti" : "sağlanmadı"}`);
 
   // BOUNDED ACTION ─────────────────────────────────────────────────────
   const action: Action | null = resolveAction(aggregation);
   if (action && !space.allowed.includes(action.fork)) throw new Error(`Action ${action.fork} outside the allowed fork space`);
-  stage("ACTION", "done", action ? `${action.fork} (${action.approvedBy})` : "awaiting guardian");
+  stage("ACTION", "done", action ? `${action.fork} (${action.approvedBy})` : "guardian bekleniyor");
 
   // EXECUTION LAYER HANDOFF ────────────────────────────────────────────
   let execution: ExecutionHandoff;
   if (!exec) {
-    execution = { status: "not-submitted", reason: deps.simulationReason ?? "simulation mode" };
+    execution = { status: "not-submitted", reason: deps.simulationReason ?? "simülasyon modu" };
     stage("EXECUTION", "skipped", execution.reason);
   } else {
     stage("EXECUTION", "running");
@@ -237,12 +237,12 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
     execution,
     reputationSource: deps.reputation.source,
     payloads: !exec
-      ? { stored: false, detail: "simulation: nothing is published" }
+      ? { stored: false, detail: "simülasyon: hiçbir şey yayımlanmaz" }
       : !deps.payloads
-        ? { stored: false, detail: "payload store not configured; only hashes are on-chain" }
+        ? { stored: false, detail: "veri deposu yapılandırılmamış; zincirde yalnızca hash'ler var" }
         : payloadErrors.length
           ? { stored: false, detail: payloadErrors.join("; ") }
-          : { stored: true, detail: "state, questions and agent runs published" },
+          : { stored: true, detail: "durum, sorular ve ajan çalıştırmaları yayımlandı" },
   };
   emit({ type: "result", decision });
   return decision;
@@ -272,7 +272,7 @@ async function handOff(
       ...base,
       onChainStatus: "OPEN",
       aggregationMatchesChain: null,
-      next: { step: "aggregate", availableAt: ctx.deadline === null ? null : ctx.deadline + 1, reason: "not every participant submitted; aggregation opens after the deadline" },
+      next: { step: "aggregate", availableAt: ctx.deadline === null ? null : ctx.deadline + 1, reason: "tüm katılımcılar göndermedi; toplama son tarihten sonra açılır" },
     };
   }
 
@@ -297,24 +297,24 @@ async function handOff(
     onChain.approved === ctx.aggregation.approved;
 
   if (status === "AGGREGATED") {
-    return { ...base, onChainStatus: status, aggregationMatchesChain: matches, next: { step: "guardian", availableAt: null, reason: "agents escalated; a guardian must choose a bounded action" } };
+    return { ...base, onChainStatus: status, aggregationMatchesChain: matches, next: { step: "guardian", availableAt: null, reason: "ajanlar yükseltti; bir guardian sınırlı bir eylem seçmeli" } };
   }
   if (!ctx.action) {
-    return { ...base, onChainStatus: status, aggregationMatchesChain: matches, next: { step: "guardian", availableAt: null, reason: "no action approved yet" } };
+    return { ...base, onChainStatus: status, aggregationMatchesChain: matches, next: { step: "guardian", availableAt: null, reason: "henüz onaylanan eylem yok" } };
   }
   if (!matches) {
     // Never execute on a disagreement between the local rules and the contract.
-    return { ...base, onChainStatus: status, aggregationMatchesChain: false, next: { step: "investigate", availableAt: null, reason: "local aggregation differs from DecisionEngine; execution withheld" } };
+    return { ...base, onChainStatus: status, aggregationMatchesChain: false, next: { step: "investigate", availableAt: null, reason: "yerel toplama DecisionEngine ile uyuşmuyor; yürütme durduruldu" } };
   }
 
   if (ctx.defer) {
-    return { ...base, onChainStatus: status, aggregationMatchesChain: true, next: { step: "execute", availableAt: null, reason: `${ctx.action.fork} approved; awaiting execution approval` } };
+    return { ...base, onChainStatus: status, aggregationMatchesChain: true, next: { step: "execute", availableAt: null, reason: `${ctx.action.fork} onaylandı; yürütme onayı bekleniyor` } };
   }
 
   try {
     const r = await exec.execute(ctx.decisionId, ctx.action);
     ctx.txs.push(r.tx);
-    return { ...base, onChainStatus: "EXECUTED", aggregationMatchesChain: true, next: { step: "resolve", availableAt: r.executedAt + ctx.horizon, reason: "outcome is verified after the horizon" } };
+    return { ...base, onChainStatus: "EXECUTED", aggregationMatchesChain: true, next: { step: "resolve", availableAt: r.executedAt + ctx.horizon, reason: "sonuç ufuk dolduktan sonra doğrulanır" } };
   } catch (err) {
     return { ...base, onChainStatus: status, aggregationMatchesChain: true, next: { step: "execute", availableAt: null, reason: errMessage(err) } };
   }

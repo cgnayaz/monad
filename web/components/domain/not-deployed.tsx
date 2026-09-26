@@ -4,14 +4,15 @@ import { EmptyState } from "@/components/ui/status";
 /** Shared empty state for anything that depends on the DecMarkt contracts. */
 export function NotDeployed({ what }: { what: string }) {
   return (
-    <EmptyState title={`No ${what} yet`}>
+    <EmptyState title={`Henüz ${what} yok`}>
       <p>
-        The DecMarkt contracts are not deployed to Monad Testnet yet, so there is nothing on-chain to show. Nothing on
-        this page is simulated: once the contracts are live, this view reads directly from them. See{" "}
+        DecMarkt kontratları henüz Monad Testnet&apos;e dağıtılmadı, bu yüzden gösterilecek zincir üstü veri yok. Bu
+        sayfadaki hiçbir şey simüle edilmez: kontratlar yayına girdiğinde bu görünüm doğrudan onlardan okur. Dağıtım durumu
+        için{" "}
         <Link href="/contracts" className="text-ink underline decoration-rule underline-offset-2 hover:decoration-ink">
-          contracts
+          kontratlar
         </Link>{" "}
-        for deployment status.
+        sayfasına bakın.
       </p>
     </EmptyState>
   );

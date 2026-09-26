@@ -6,6 +6,7 @@
  */
 const SECRET_PATTERNS: RegExp[] = [
   /sk-ant-[A-Za-z0-9_-]+/g, // Anthropic keys
+  /AIza[0-9A-Za-z_-]{30,}/g, // Google / Gemini API keys
   /\b0x[0-9a-fA-F]{64}\b/g, // private keys (and 32-byte hashes; redacting a hash in an error is harmless)
   /Bearer\s+[A-Za-z0-9._~+/=-]+/gi,
   /([?&](?:key|apikey|api_key|token)=)[^&\s]+/gi,

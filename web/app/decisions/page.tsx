@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/layout";
 import { EmptyState } from "@/components/ui/status";
 import { listDecisions } from "@/lib/data/decisions";
 
-export const metadata: Metadata = { title: "Decisions" };
+export const metadata: Metadata = { title: "Kararlar" };
 export const dynamic = "force-dynamic";
 
 export default async function DecisionsPage() {
@@ -13,18 +13,18 @@ export default async function DecisionsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="History"
-        title="Decisions"
-        lead="Every decision recorded in DecisionRegistry, newest first. Open one for the full audit trail: state, questions, each agent's decision, aggregation, action, outcome and settlement."
+        eyebrow="Geçmiş"
+        title="Kararlar"
+        lead="DecisionRegistry'ye kaydedilen tüm kararlar, en yeniden eskiye. Tam denetim izi için birini açın: durum, sorular, her ajanın kararı, toplama, eylem, sonuç ve uzlaşma."
       />
       {decisions.status === "unavailable" ? (
         decisions.reason.startsWith("Contracts") ? (
-          <NotDeployed what="decisions" />
+          <NotDeployed what="karar" />
         ) : (
-          <EmptyState title="Decisions unavailable">{decisions.reason}</EmptyState>
+          <EmptyState title="Kararlar okunamadı">{decisions.reason}</EmptyState>
         )
       ) : decisions.value.length === 0 ? (
-        <EmptyState title="No decisions recorded">No decision has been created on the deployed registry yet.</EmptyState>
+        <EmptyState title="Kayıtlı karar yok">Dağıtılmış kayıt defterinde henüz karar oluşturulmadı.</EmptyState>
       ) : (
         <DecisionTable rows={decisions.value} />
       )}

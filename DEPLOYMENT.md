@@ -78,8 +78,8 @@ Environment variables — the full annotated list is [web/.env.example](web/.env
 | Variable | Kind | Needed for |
 |---|---|---|
 | `NEXT_PUBLIC_MONAD_RPC_URL` | public (optional) | browser + server RPC; default `https://testnet-rpc.monad.xyz` |
-| `AI_PROVIDER` | config (optional) | `gemini` or `anthropic`; default `gemini` when `GEMINI_API_KEY` is set |
-| `GEMINI_API_KEY` | secret | every round (simulation and live) with the Gemini provider |
+| `AI_PROVIDER` | config (optional) | `gemini` or `anthropic` (case-insensitive); default `gemini`, `anthropic` only when `ANTHROPIC_API_KEY` is the only key set |
+| `GEMINI_API_KEY` | secret | every round (simulation and live) with the Gemini provider; `GOOGLE_API_KEY` is accepted as an alias. Verify with `cd web && npm run gemini:check` |
 | `AI_MODEL`, `AI_FALLBACK_MODEL` | config (optional) | Gemini defaults `gemini-3.8-flash`, fallbacks `gemini-3.7-flash,gemini-3.6-flash` |
 | `ANTHROPIC_API_KEY` | secret (optional) | only with `AI_PROVIDER=anthropic` (default model `claude-opus-5`); the account needs credit |
 | `PYTH_API_KEY`, `PYTH_HERMES_URL` | secret / config | signed prices (execute, resolve, verification); key entitled to ETH/USD |
@@ -90,7 +90,8 @@ Environment variables — the full annotated list is [web/.env.example](web/.env
 Only `NEXT_PUBLIC_MONAD_RPC_URL` reaches the browser. Chain id, explorer, contract addresses
 and the Pyth contract/feed are committed (`web/lib/chain/deployments.10143.json`,
 `web/lib/config/public.ts`) and were checked against the chain on 2026-09-26. Empty variables
-count as not configured; the dashboard shows which mode (live / simulation / unavailable) the
+count as not configured; surrounding quotes and whitespace are stripped, and a malformed value is
+ignored and named on the dashboard instead of failing the server. The dashboard shows which mode (live / simulation / unavailable) the
 deployment can run and why.
 
 Runtime notes:

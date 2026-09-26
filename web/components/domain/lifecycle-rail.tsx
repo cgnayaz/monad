@@ -35,17 +35,17 @@ export function LifecycleRail({ current, transitions = [] }: { current?: Status;
                       {shortHex(t.tx.hash, 4, 4)}
                     </a>
                   ) : (
-                    <span>block {t.blockNumber.toString()}</span>
+                    <span>blok {t.blockNumber.toString()}</span>
                   )
                 ) : current && !cancelled && currentIdx >= 0 && STATUSES.indexOf(s) > currentIdx ? (
-                  <span className="text-ink-3">pending</span>
+                  <span className="text-ink-3">bekliyor</span>
                 ) : null}
               </div>
             </li>
           );
         })}
       </ol>
-      {cancelled && <p className="mt-2 text-[12px] text-fail">CANCELLED — bond locks released, no settlement.</p>}
+      {cancelled && <p className="mt-2 text-[12px] text-fail">CANCELLED — teminat kilitleri açıldı, uzlaşma yok.</p>}
     </div>
   );
 }

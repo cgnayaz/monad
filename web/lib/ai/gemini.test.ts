@@ -19,7 +19,7 @@ vi.mock("@google/genai", async (orig) => {
 
 import { ApiError, FinishReason } from "@google/genai";
 import { AGENTS } from "@/lib/jev/agents";
-import { GeminiProvider } from "./gemini";
+import { GeminiProvider, supportsThinkingLevel } from "./gemini";
 import type { EvaluationRequest } from "./provider";
 
 const req = { agent: AGENTS[0], state: { stateId: "st_x", subject: { referenceFeed: "ETH/USD" }, inputs: [] }, questions: [], horizonSec: 60, bandBps: 10 } as unknown as EvaluationRequest;
@@ -51,7 +51,7 @@ describe("GeminiProvider", () => {
     script.responses.push(overloaded, overloaded, overloaded, overloaded);
     await expect(new GeminiProvider("k", "m1", ["m2"]).evaluate(req, new AbortController().signal)).rejects.toMatchObject({
       kind: "provider_error",
-      message: "Provider is unavailable (HTTP 503)",
+      message: "Sağlayıcı kullanılamıyor (HTTP 503)",
     });
     expect(script.calls).toEqual(["m1", "m2", "m1", "m2"]);
   });
@@ -60,7 +60,7 @@ describe("GeminiProvider", () => {
     script.responses.push(() => {
       throw new ApiError({ message: "API key not valid", status: 400 });
     });
-    await expect(new GeminiProvider("k", "m1", ["m2"]).evaluate(req, new AbortController().signal)).rejects.toMatchObject({ message: "Provider rejected credentials" });
+    await expect(new GeminiProvider("k", "m1", ["m2"]).evaluate(req, new AbortController().signal)).rejects.toMatchObject({ message: expect.stringContaining("API anahtarını reddetti") });
     expect(script.calls).toEqual(["m1"]);
   });
 
@@ -69,5 +69,11 @@ describe("GeminiProvider", () => {
     await expect(new GeminiProvider("k", "m1", []).evaluate(req, new AbortController().signal)).rejects.toMatchObject({ kind: "truncated" });
     script.responses.push(() => ({ text: "", modelVersion: "m1", candidates: [{ finishReason: FinishReason.SAFETY }] }));
     await expect(new GeminiProvider("k", "m1", []).evaluate(req, new AbortController().signal)).rejects.toMatchObject({ kind: "refusal" });
+  });
+
+  it("sends thinkingLevel only to models that accept it", () => {
+    expect(supportsThinkingLevel("gemini-3.8-flash")).toBe(true);
+    expect(supportsThinkingLevel("models/gemini-3.7-flash")).toBe(true);
+    expect(supportsThinkingLevel("gemini-2.5-flash")).toBe(false);
   });
 });

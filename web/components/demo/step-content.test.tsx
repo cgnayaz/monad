@@ -59,16 +59,16 @@ describe("Demo steps render real pipeline output", () => {
     const v = fromRound({ state: d.state, questions: d.questions, runs: {}, running: {}, submissions: {}, decision: d });
 
     const lanes = renderToStaticMarkup(<ParallelStep v={v} startedAt={null} />);
-    expect(lanes).toContain("Timeout");
-    expect(lanes.match(/decided/g)).toHaveLength(4);
+    expect(lanes).toContain("Zaman aşımı");
+    expect(lanes.match(/karar verdi/g)).toHaveLength(4);
 
     const prims = renderToStaticMarkup(<PrimitivesStep v={v} />);
     expect(prims).toContain("DERISK");
-    expect(prims).toContain("counted as missed");
+    expect(prims).toContain("kaçırılmış sayılır");
 
     const batch = renderToStaticMarkup(<BatchStep v={v} decision={d} />);
-    expect(batch).toContain("final decision → aggregation");
-    expect(batch).toContain("no answer"); // the failed agent's assigned cells
+    expect(batch).toContain("nihai karar → toplama");
+    expect(batch).toContain("yanıt yok"); // the failed agent's assigned cells
 
     const forks = renderToStaticMarkup(<ForksStep v={v} allowed={[...FORKS]} />);
     for (const f of FORKS) expect(forks).toContain(f);
@@ -80,14 +80,14 @@ describe("Demo steps render real pipeline output", () => {
     const v = fromRound({ state: d.state, questions: d.questions, runs: {}, running: {}, submissions: {}, decision: d });
 
     const agg = renderToStaticMarkup(<AggregationStep v={v} />);
-    expect(agg).toContain("Aggregate score");
+    expect(agg).toContain("Toplam skor");
     expect(agg).toContain("DERISK");
 
     const action = renderToStaticMarkup(<ActionStep v={v} mode="simulation" sim={{ fork: "DERISK", start: { price: "3471000", expo: -8, publishTime: NOW } }} />);
-    expect(action).toContain("no transaction");
+    expect(action).toContain("işlem yok");
 
     const monad = renderToStaticMarkup(withProviders(<MonadStep mode="simulation" txs={[]} awaiting={false} onExecute={() => {}} />));
-    expect(monad).toContain("No transactions");
+    expect(monad).toContain("İşlem yok");
 
     const observed = correctFork(3_471_000n, 3_452_000n, 10);
     const verify = renderToStaticMarkup(
@@ -96,8 +96,8 @@ describe("Demo steps render real pipeline output", () => {
         r={{ expected: "DERISK", observed, success: observed === "DERISK", startPrice: "0.03471", endPrice: "0.03452", startTime: NOW, endTime: NOW + 60, moveBps: "-54", bandBps: 10, source: "pyth-offchain" }}
       />,
     );
-    expect(verify).toContain("success");
-    expect(verify).toContain("not verified on-chain in simulation");
+    expect(verify).toContain("başarılı");
+    expect(verify).toContain("simülasyonda zincirde doğrulanmaz");
 
     const sim = settle(
       "0",
@@ -106,8 +106,8 @@ describe("Demo steps render real pipeline output", () => {
       { slashBps: 3000, missPenaltyBps: 1000, roundReward: 20_000_000_000_000_000n },
     );
     const settlement = renderToStaticMarkup(<SettlementStep mode="simulation" v={v} sim={sim} />);
-    expect(settlement).toContain("MISSED");
-    expect(settlement).toContain("CORRECT");
-    expect(settlement).toContain("notional bonds");
+    expect(settlement).toContain("KAÇIRDI");
+    expect(settlement).toContain("DOĞRU");
+    expect(settlement).toContain("itibari teminatlar");
   });
 });

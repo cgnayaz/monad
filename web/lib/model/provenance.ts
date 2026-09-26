@@ -122,47 +122,47 @@ export function traceDecision(p: DecisionProvenance, agentId: AgentId): Provenan
     {
       stage: "STATE",
       status: isFullState(p.state) ? "present" : "reference-only",
-      ref: p.state.stateId ?? "state",
+      ref: p.state.stateId ?? "durum",
       hash: p.decision.stateHash,
       tx: txFor(p, "CREATED"),
     },
     {
       stage: "QUESTION",
       status: question ? "present" : "reference-only",
-      ref: question ? `${question.questionId} [${question.category}]` : "ACTION question",
+      ref: question ? `${question.questionId} [${question.category}]` : "ACTION sorusu",
       hash: p.decision.questionsHash,
     },
     {
       stage: "AGENT",
       status: agent ? "present" : "pending",
-      ref: agent ? `${agent.name} (#${agent.agentId})${agent.operator ? ` ${agent.operator}` : ""}` : `agent #${agentId}`,
+      ref: agent ? `${agent.name} (#${agent.agentId})${agent.operator ? ` ${agent.operator}` : ""}` : `ajan #${agentId}`,
     },
     {
       stage: "DECISION",
       status: submission ? "present" : "pending",
       ref: submission
-        ? `${submission.choice} · score ${submission.score} · p ${submission.probability} · bond ${submission.bond} · ${answered} answer(s)`
-        : "no final submission",
+        ? `${submission.choice} · skor ${submission.score} · p ${submission.probability} · teminat ${submission.bond} · ${answered} yanıt`
+        : "nihai gönderim yok",
       hash: submission?.reasonHash,
     },
     {
       stage: "AGGREGATION",
       status: p.aggregation ? "present" : "pending",
       ref: p.aggregation
-        ? `leading ${p.aggregation.leading}, ${p.aggregation.passed ? "passed" : "not passed"}${contribution ? `, weight ${contribution.weight}` : ""}`
-        : "not aggregated",
+        ? `önde ${p.aggregation.leading}, ${p.aggregation.passed ? "geçti" : "geçmedi"}${contribution ? `, ağırlık ${contribution.weight}` : ""}`
+        : "toplanmadı",
       tx: txFor(p, "AGGREGATED"),
     },
     {
       stage: "ACTION",
       status: p.action ? "present" : "pending",
-      ref: p.action ? `${p.action.fork} (${p.action.approvedBy})` : "not approved",
+      ref: p.action ? `${p.action.fork} (${p.action.approvedBy})` : "onaylanmadı",
       tx: txFor(p, "APPROVED"),
     },
     {
       stage: "TRANSACTION",
       status: p.action?.execution ? "present" : "pending",
-      ref: p.action?.execution?.tx?.hash ?? "not executed",
+      ref: p.action?.execution?.tx?.hash ?? "yürütülmedi",
       tx: txFor(p, "EXECUTED"),
     },
     {
@@ -170,15 +170,15 @@ export function traceDecision(p: DecisionProvenance, agentId: AgentId): Provenan
       status: p.outcome ? "present" : "pending",
       ref: p.outcome
         ? p.outcome.status === "VOID"
-          ? "void"
-          : `correct ${p.outcome.observedResult?.correctFork}, success ${p.outcome.success}`
-        : "not resolved",
+          ? "geçersiz"
+          : `doğru çatal ${p.outcome.observedResult?.correctFork}, başarı ${p.outcome.success ? "evet" : "hayır"}`
+        : "sonuçlanmadı",
       tx: txFor(p, "RESOLVED"),
     },
     {
       stage: "SETTLEMENT",
       status: line && line.settlementStatus === "SETTLED" ? "present" : "pending",
-      ref: line ? `${line.result ?? line.settlementStatus} · reward ${line.reward} · penalty ${line.penalty}` : "not settled",
+      ref: line ? `${line.result ?? line.settlementStatus} · ödül ${line.reward} · ceza ${line.penalty}` : "uzlaşılmadı",
       tx: p.settlement?.tx ?? null,
     },
   ];

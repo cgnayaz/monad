@@ -73,7 +73,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function json<T>(res: Response): Promise<T> {
   const body = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
-  if (!res.ok || !body) throw new Error(body?.error ?? `Request failed (${res.status})`);
+  if (!res.ok || !body) throw new Error(body?.error ?? `İstek başarısız (${res.status})`);
   return body;
 }
 
@@ -121,8 +121,8 @@ export function useDemo() {
           if (e.stage === "STATE" && e.status === "running") set("STATE", { status: "active" });
           if (e.stage === "QUESTIONS" && e.status === "running") set("QUESTIONS", { status: "active" });
           if (e.stage === "COMMIT" && e.status === "done") {
-            for (const t of e.txs ?? []) addTx({ label: t.functionName, hash: t.hash, status: "confirmed", detail: "before any agent ran" });
-            set("MONAD", { status: "active", note: "state and question hashes committed" });
+            for (const t of e.txs ?? []) addTx({ label: t.functionName, hash: t.hash, status: "confirmed", detail: "hiçbir ajan çalışmadan önce" });
+            set("MONAD", { status: "active", note: "durum ve soru hash'leri zincire işlendi" });
           }
           if (e.stage === "PARALLEL_DECISIONS" && e.status === "running") {
             setParallelStartedAt(Date.now());
@@ -173,23 +173,23 @@ export function useDemo() {
     async (from: "ACTION" | "VERIFY", d: NonNullable<RoundProgress["decision"]>, execution: { fork: Fork; start: PriceObs } | null) => {
       let exec = execution;
       if (from === "ACTION") {
-        if (!d.action) return fail("ACTION", "No action approved (awaiting a guardian); simulation stops here.");
+        if (!d.action) return fail("ACTION", "Onaylanan eylem yok (guardian bekleniyor); simülasyon burada durur.");
         set("ACTION", { status: "active" });
         try {
           const start = await json<PriceObs>(await fetch("/api/oracle/price", { cache: "no-store" }));
           exec = { fork: d.action.fork, start };
           setSimExecution(exec);
-          set("ACTION", { status: "done", note: `applied to the local vault model at publish time ${start.publishTime}` });
-          set("MONAD", { status: "skipped", note: "simulation mode sends no transactions" });
+          set("ACTION", { status: "done", note: `yerel kasa modeline ${start.publishTime} yayın zamanında uygulandı` });
+          set("MONAD", { status: "skipped", note: "simülasyon modu işlem göndermez" });
         } catch (err) {
-          return fail("ACTION", `Start price unavailable: ${(err as Error).message}`);
+          return fail("ACTION", `Başlangıç fiyatı alınamadı: ${(err as Error).message}`);
         }
       }
       if (!exec) return;
       // VERIFY: wait for the horizon, then observe the real published price.
       set("VERIFY", { status: "active" });
       const t0 = exec.start.publishTime + d.parameters.horizon;
-      setCountdown({ label: "horizon", until: t0 + 2, total: d.parameters.horizon });
+      setCountdown({ label: "ufuk", until: t0 + 2, total: d.parameters.horizon });
       while (nowSec() < t0 + 2) {
         if (cancelled.current) return;
         await sleep(500);
@@ -199,9 +199,9 @@ export function useDemo() {
       try {
         end = await json<PriceObs>(await fetch(`/api/oracle/price?at=${t0}`, { cache: "no-store" }));
       } catch (err) {
-        return fail("VERIFY", `Observed price unavailable: ${(err as Error).message}`);
+        return fail("VERIFY", `Gözlenen fiyat alınamadı: ${(err as Error).message}`);
       }
-      if (end.expo !== exec.start.expo) return fail("VERIFY", "Price exponent changed between observations");
+      if (end.expo !== exec.start.expo) return fail("VERIFY", "Gözlemler arasında fiyat üssü değişti");
       const observed = correctFork(BigInt(exec.start.price), BigInt(end.price), d.parameters.bandBps);
       const result: VerifyResult = {
         expected: exec.fork,
@@ -229,7 +229,7 @@ export function useDemo() {
         };
       });
       setSimSettlement(settle("0", participants, observed, { slashBps: DEFAULT_PARAMS.slashBps, missPenaltyBps: DEFAULT_PARAMS.missPenaltyBps, roundReward: DEFAULT_PARAMS.roundReward }));
-      set("SETTLEMENT", { status: "done", note: "notional bonds; nothing is transferred" });
+      set("SETTLEMENT", { status: "done", note: "itibari teminatlar; hiçbir şey transfer edilmez" });
       setRunning(false);
     },
     [fail, set],
@@ -255,7 +255,7 @@ export function useDemo() {
       }
       const at = v.outcome.availableAt;
       if (at) {
-        setCountdown({ label: "horizon", until: at + 1, total: at + 1 - (v.execution.executedAt ?? at) });
+        setCountdown({ label: "ufuk", until: at + 1, total: at + 1 - (v.execution.executedAt ?? at) });
         while (nowSec() < at + 1) {
           if (cancelled.current) return;
           await sleep(500);
@@ -283,7 +283,7 @@ export function useDemo() {
       } catch (err) {
         return fail("VERIFY", (err as Error).message);
       }
-      if (v.outcome.status !== "verified" && v.outcome.status !== "void") return fail("VERIFY", `Outcome not recorded (status ${v.status})`);
+      if (v.outcome.status !== "verified" && v.outcome.status !== "void") return fail("VERIFY", `Sonuç kaydedilmedi (durum ${v.status})`);
       setVerify(
         v.outcome.status === "verified"
           ? {
@@ -300,7 +300,7 @@ export function useDemo() {
             }
           : null,
       );
-      set("VERIFY", { status: "done", note: v.outcome.status === "void" ? "void: bonds returned" : undefined });
+      set("VERIFY", { status: "done", note: v.outcome.status === "void" ? "geçersiz: teminatlar iade edildi" : undefined });
       set("SETTLEMENT", { status: "done" });
       setRunning(false);
     },
@@ -311,18 +311,18 @@ export function useDemo() {
   const executeLive = useCallback(
     async (via: "wallet" | "keeper") => {
       if (!decisionId || !decision?.action) return;
-      set("MONAD", { status: "active", note: via === "wallet" ? "awaiting wallet approval" : "keeper executing" });
+      set("MONAD", { status: "active", note: via === "wallet" ? "cüzdan onayı bekleniyor" : "keeper yürütüyor" });
       set("ACTION", { status: "active" });
       try {
         if (via === "keeper") {
           addTx({ label: "ExecutionVault.execute", hash: null, status: "pending", detail: "keeper" });
           const r = await advance(decisionId);
-          if (r.step !== "execute" || !r.tx) throw new Error(r.note ?? `Unexpected step ${r.step}`);
+          if (r.step !== "execute" || !r.tx) throw new Error(r.note ?? `Beklenmeyen adım ${r.step}`);
           addTx({ label: "ExecutionVault.execute", hash: r.tx.hash, status: "confirmed", detail: "keeper" });
         } else {
           const receipt = await walletTx.run({ kind: "execute", decisionId });
           if (!receipt) throw new Error("wallet transaction did not confirm (see the transaction panel)");
-          addTx({ label: "ExecutionVault.execute", hash: receipt.hash, status: "confirmed", detail: `wallet · block ${receipt.blockNumber}` });
+          addTx({ label: "ExecutionVault.execute", hash: receipt.hash, status: "confirmed", detail: `cüzdan · blok ${receipt.blockNumber}` });
         }
         set("ACTION", { status: "done" });
         set("MONAD", { status: "done" });
@@ -358,7 +358,7 @@ export function useDemo() {
       if (!res.ok || !res.body) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         const retry = res.headers.get("Retry-After");
-        return fail("STATE", `${body?.error ?? `Request failed (${res.status})`}${retry ? ` — retry in ${retry} s` : ""}`);
+        return fail("STATE", `${body?.error ?? `İstek başarısız (${res.status})`}${retry ? ` — ${retry} sn sonra tekrar deneyin` : ""}`);
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -383,18 +383,18 @@ export function useDemo() {
     } catch (err) {
       return fail(lastActive, (err as Error).message);
     }
-    if (!result) return fail(lastActive, "The round ended without a result");
+    if (!result) return fail(lastActive, "Tur sonuçsuz bitti");
 
     if (m === "simulation") return simulateFrom("ACTION", result, null);
 
     // Live: the pipeline stops at approval (or earlier when aggregation must wait).
     const ex = result.execution;
-    if (ex.status !== "submitted") return fail("MONAD", ex.status === "not-submitted" ? ex.reason : "Not submitted");
-    if (ex.aggregationMatchesChain === false) return fail("AGGREGATION", ex.next?.reason ?? "Local aggregation differs from DecisionEngine");
+    if (ex.status !== "submitted") return fail("MONAD", ex.status === "not-submitted" ? ex.reason : "Gönderilmedi");
+    if (ex.aggregationMatchesChain === false) return fail("AGGREGATION", ex.next?.reason ?? "Yerel toplama DecisionEngine ile uyuşmuyor");
     if (ex.next?.step === "aggregate") {
-      set("AGGREGATION", { status: "active", note: "waiting for the submission deadline" });
+      set("AGGREGATION", { status: "active", note: "gönderim son tarihi bekleniyor" });
       const until = ex.next.availableAt ?? nowSec();
-      setCountdown({ label: "submission window", until, total: result.parameters.submissionWindow });
+      setCountdown({ label: "gönderim penceresi", until, total: result.parameters.submissionWindow });
       while (nowSec() < until) {
         if (cancelled.current) return;
         await sleep(500);
@@ -404,16 +404,16 @@ export function useDemo() {
         const r = await advance(result.decisionId);
         if (r.tx) addTx({ label: "DecisionEngine.aggregate", hash: r.tx.hash, status: "confirmed" });
         const v = await refreshChain(result.decisionId);
-        if (v.status === "CANCELLED") return fail("AGGREGATION", "Quorum not met; the decision was cancelled and bonds returned");
+        if (v.status === "CANCELLED") return fail("AGGREGATION", "Yeter sayı sağlanmadı; karar iptal edildi ve teminatlar iade edildi");
       } catch (err) {
         return fail("AGGREGATION", (err as Error).message);
       }
     } else if (ex.next?.step === "guardian") {
-      set("ACTION", { status: "active", note: "agents escalated; a guardian must choose" });
-      return fail("ACTION", "Escalated: a guardian decision is required before execution (use the guardian wallet)");
+      set("ACTION", { status: "active", note: "ajanlar yükseltti; bir guardian seçmeli" });
+      return fail("ACTION", "Yükseltildi: yürütmeden önce guardian kararı gerekli (guardian cüzdanını kullanın)");
     }
-    set("ACTION", { status: "active", note: "approved; awaiting execution" });
-    set("MONAD", { status: "active", note: "approve the execution in your wallet, or let the keeper execute" });
+    set("ACTION", { status: "active", note: "onaylandı; yürütme bekleniyor" });
+    set("MONAD", { status: "active", note: "yürütmeyi cüzdanınızda onaylayın ya da keeper yürütsün" });
     setRunning(false); // waiting for the user's choice
   }, [advance, fail, mode, onEvent, refreshChain, set, simulateFrom]);
 
@@ -435,7 +435,7 @@ export function useDemo() {
       setSteps((prev) => {
         const next = { ...prev };
         for (const k of STEPS.slice(STEPS.indexOf(failed))) next[k] = { status: "pending" };
-        if (failed === "MONAD") next.MONAD = { status: "active", note: "retry: approve in your wallet or use the keeper" };
+        if (failed === "MONAD") next.MONAD = { status: "active", note: "tekrar: cüzdanınızda onaylayın ya da keeper kullanın" };
         return next;
       });
       if (failed === "MONAD") return setRunning(false);

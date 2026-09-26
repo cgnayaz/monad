@@ -4,31 +4,32 @@ import { Table, Td, Th } from "@/components/ui/table";
 import { explorer } from "@/lib/chain/monad";
 import { formatMon } from "@/lib/format";
 import type { AgentView } from "@/lib/data/agents";
+import { AGENT_TR, agentName } from "@/lib/i18n";
 
 /** Agent identity and accountability record. On-chain columns are blank until read from chain. */
 export function AgentTable({ agents, showMandate = false }: { agents: AgentView[]; showMandate?: boolean }) {
   return (
-    <Table caption="Agents">
+    <Table caption="Ajanlar">
       <thead>
         <tr>
           <Th>ID</Th>
-          <Th>Agent</Th>
-          <Th>Primary question</Th>
-          {showMandate && <Th>Mandate</Th>}
-          <Th>Operator</Th>
-          <Th align="right">Bond (MON)</Th>
-          <Th align="right">Locked</Th>
-          <Th align="right">Correct / resolved</Th>
-          <Th align="right">Missed</Th>
+          <Th>Ajan</Th>
+          <Th>Ana soru</Th>
+          {showMandate && <Th>Görev tanımı</Th>}
+          <Th>Operatör</Th>
+          <Th align="right">Teminat (MON)</Th>
+          <Th align="right">Kilitli</Th>
+          <Th align="right">Doğru / sonuçlanan</Th>
+          <Th align="right">Kaçırılan</Th>
         </tr>
       </thead>
       <tbody>
         {agents.map(({ spec, onChain }) => (
           <tr key={spec.key}>
             <Td mono className="text-ink-3">{spec.agentId}</Td>
-            <Td className="whitespace-nowrap font-medium">{spec.name}</Td>
+            <Td className="whitespace-nowrap font-medium">{agentName(spec.key, spec.name)}</Td>
             <Td mono className="text-ink-2">{spec.primaryQuestion}</Td>
-            {showMandate && <Td className="min-w-[320px] text-ink-2">{spec.mandate}</Td>}
+            {showMandate && <Td className="min-w-[320px] text-ink-2">{AGENT_TR[spec.key]?.mandate ?? spec.mandate}</Td>}
             <Td>
               <Avail value={onChain}>{(a) => <Hash value={a.operator} href={explorer.address(a.operator)} />}</Avail>
             </Td>

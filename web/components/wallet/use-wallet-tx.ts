@@ -64,19 +64,19 @@ export function useWalletTx() {
       try {
         const call = prepareAction(action, opts.resolveAt);
         label = call.label;
-        setState({ ...IDLE, phase: "preparing", label, note: "building the call and simulating it" });
+        setState({ ...IDLE, phase: "preparing", label, note: "çağrı oluşturuluyor ve simüle ediliyor" });
 
         if (!isConnected || !address) return fail({ kind: "no-wallet", message: "Connect a wallet first.", detail: "not connected" });
         if (!publicClient) return fail({ kind: "rpc", message: "Monad RPC client unavailable.", detail: "no public client" });
         if (chainId !== monadTestnet.id) {
-          setState((s) => ({ ...s, note: "switching the wallet to Monad Testnet" }));
+          setState((s) => ({ ...s, note: "cüzdan Monad Testnet'e geçiriliyor" }));
           await switchChainAsync({ chainId: monadTestnet.id });
         }
 
         let args = call.args;
         let value = 0n;
         if (call.priceUpdate) {
-          setState((s) => ({ ...s, note: "fetching the signed Pyth price update" }));
+          setState((s) => ({ ...s, note: "imzalı Pyth fiyat güncellemesi alınıyor" }));
           const res = await fetch(`/api/oracle/update${call.priceUpdate.at ? `?at=${call.priceUpdate.at}` : ""}`, { cache: "no-store" });
           const body = (await res.json().catch(() => null)) as { data?: Hex[]; error?: string } | null;
           if (!res.ok || !body?.data) return fail({ kind: "rpc", message: `Oracle update unavailable: ${body?.error ?? res.status}`, detail: body?.error ?? String(res.status) });
@@ -84,7 +84,7 @@ export function useWalletTx() {
           args = [...args, body.data];
         }
 
-        setState((s) => ({ ...s, note: "simulating against the current chain state" }));
+        setState((s) => ({ ...s, note: "güncel zincir durumuna karşı simüle ediliyor" }));
         await publicClient.simulateContract({ account: address, address: call.address, abi: call.abi, functionName: call.functionName, args, value });
 
         // Monad charges the gas limit, so the limit is the estimate plus a 10 % margin.
@@ -103,7 +103,7 @@ export function useWalletTx() {
           });
         }
 
-        setState((s) => ({ ...s, phase: "awaiting-approval", note: "confirm the transaction in your wallet" }));
+        setState((s) => ({ ...s, phase: "awaiting-approval", note: "işlemi cüzdanınızda onaylayın" }));
         const hash = await writeContractAsync({
           address: call.address,
           abi: call.abi,
@@ -114,8 +114,8 @@ export function useWalletTx() {
           chainId: monadTestnet.id,
         });
 
-        setState((s) => ({ ...s, phase: "submitted", hash, note: "broadcast to Monad Testnet" }));
-        setState((s) => ({ ...s, phase: "confirming", note: "waiting for the receipt" }));
+        setState((s) => ({ ...s, phase: "submitted", hash, note: "Monad Testnet'e yayınlandı" }));
+        setState((s) => ({ ...s, phase: "confirming", note: "makbuz bekleniyor" }));
         const r = await publicClient.waitForTransactionReceipt({ hash, timeout: 90_000 });
         const receipt: TxReceiptView = {
           hash: r.transactionHash,

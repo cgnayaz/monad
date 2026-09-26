@@ -6,6 +6,7 @@ import { StatusMark, type Tone } from "@/components/ui/status";
 import { Table, Td, Th } from "@/components/ui/table";
 import { explorer } from "@/lib/chain/monad";
 import { formatBps, formatMon, formatUtc } from "@/lib/format";
+import { integrityLabel, outcomeLabel, resultLabel, settlementLabel } from "@/lib/i18n";
 import type { DecisionView, TxView } from "@/lib/view/decision-view";
 
 const muted = (s: string) => <span className="text-ink-3">{s}</span>;
@@ -17,15 +18,15 @@ export function AggregationPanel({ v }: { v: DecisionView }) {
   const g = v.aggregation;
   if (!g) {
     return (
-      <Panel title="Aggregation & threshold">
-        <p className="px-4 py-4 text-[13px] text-ink-3">Not aggregated yet. Aggregation is deterministic integer arithmetic over the agents&apos; final decisions.</p>
+      <Panel title="Toplama ve eşik">
+        <p className="px-4 py-4 text-[13px] text-ink-3">Henüz toplanmadı. Toplama, ajanların nihai kararları üzerinde deterministik tamsayı aritmetiğidir.</p>
       </Panel>
     );
   }
   const total = BigInt(g.total);
   const threshold = v.threshold.thresholdBps / 100;
   return (
-    <Panel title="Aggregation & threshold">
+    <Panel title="Toplama ve eşik">
       <ul className="space-y-2.5 px-4 pt-4">
         {g.support.map(({ fork, value }, i) => {
           const pct = total === 0n ? 0 : Number((BigInt(value) * 10_000n) / total) / 100;
@@ -44,25 +45,25 @@ export function AggregationPanel({ v }: { v: DecisionView }) {
       </ul>
       <p className="px-4 pb-3 pt-2 text-[11.5px] text-ink-3">
         <span aria-hidden className="mr-1.5 inline-block h-2 w-px translate-y-px bg-accent" />
-        threshold {threshold.toFixed(0)} % · weight = probability × on-chain accuracy · total {g.total}
+        eşik %{threshold.toFixed(0)} · ağırlık = olasılık × zincir üstü isabet · toplam {g.total}
       </p>
       <KeyValue
         rows={[
-          { k: "Quorum", v: <Gate ok={g.gates ? g.gates.quorum : g.submissions >= v.threshold.quorum}>{`${g.submissions} decisions · quorum ${v.threshold.quorum}`}</Gate> },
+          { k: "Yeter sayı", v: <Gate ok={g.gates ? g.gates.quorum : g.submissions >= v.threshold.quorum}>{`${g.submissions} karar · yeter sayı ${v.threshold.quorum}`}</Gate> },
           {
-            k: "Support share",
+            k: "Destek payı",
             v: <Gate ok={g.gates ? g.gates.share : g.passed}>{`${g.supportShareBps === null ? "—" : formatBps(g.supportShareBps, 1)} ≥ ${formatBps(v.threshold.thresholdBps, 0)}`}</Gate>,
           },
           {
-            k: "Action score",
+            k: "Eylem skoru",
             v:
               g.leading === "DERISK" || g.leading === "DEPLOY" ? (
                 <Gate ok={g.gates ? g.gates.score : g.passed}>{`${g.aggregateScore ?? "—"} ≥ ${v.threshold.minActionScore}`}</Gate>
               ) : (
-                muted(`not required for ${g.leading}`)
+                muted(`${g.leading} için gerekmez`)
               ),
           },
-          { k: "Verdict", v: <StatusMark tone={g.passed ? "pass" : "fail"}>{g.passed ? "threshold passed" : "not met → NO_ACTION"}</StatusMark> },
+          { k: "Karar", v: <StatusMark tone={g.passed ? "pass" : "fail"}>{g.passed ? "eşik geçildi" : "sağlanmadı → NO_ACTION"}</StatusMark> },
         ]}
       />
     </Panel>
@@ -72,7 +73,7 @@ export function AggregationPanel({ v }: { v: DecisionView }) {
 function Gate({ ok, children }: { ok: boolean; children: ReactNode }) {
   return (
     <span className="flex flex-wrap items-baseline gap-x-2">
-      <StatusMark tone={ok ? "pass" : "fail"}>{ok ? "pass" : "fail"}</StatusMark>
+      <StatusMark tone={ok ? "pass" : "fail"}>{ok ? "geçti" : "kaldı"}</StatusMark>
       <span className="font-mono text-[12.5px]">{children}</span>
     </span>
   );
@@ -83,36 +84,36 @@ function Gate({ ok, children }: { ok: boolean; children: ReactNode }) {
 export function ActionPanel({ v }: { v: DecisionView }) {
   const e = v.execution;
   return (
-    <Panel title="Bounded action & execution">
+    <Panel title="Sınırlı eylem ve yürütme">
       <KeyValue
         rows={[
           {
-            k: "Approved action",
+            k: "Onaylanan eylem",
             v: v.action ? (
               <span>
                 <span className="font-mono">{v.action.fork}</span> <span className="text-ink-2">· {v.action.alias} · {v.action.approvedBy}</span>
                 <span className="block text-[12px] text-ink-2">{v.action.effect}</span>
               </span>
             ) : v.aggregation?.guardianRequired ? (
-              "awaiting guardian (escalated)"
+              "guardian bekleniyor (yükseltildi)"
             ) : (
-              muted("not approved yet")
+              muted("henüz onaylanmadı")
             ),
           },
           {
-            k: "Execution",
+            k: "Yürütme",
             v: (
               <StatusMark tone={e.status === "executed" ? "pass" : e.status === "awaiting" ? "wait" : "neutral"}>
-                {e.status === "executed" ? "executed" : e.status === "awaiting" ? "awaiting" : e.status === "not-submitted" ? "not submitted" : "—"}
+                {e.status === "executed" ? "yürütüldü" : e.status === "awaiting" ? "bekliyor" : e.status === "not-submitted" ? "gönderilmedi" : "—"}
               </StatusMark>
             ),
           },
-          ...(e.status !== "executed" && e.detail !== "—" ? [{ k: "Detail", v: <span className="text-[12.5px] text-ink-2">{e.detail}</span> }] : []),
-          ...(e.amountMoved !== null ? [{ k: "Amount moved", v: <span className="font-mono">{formatMon(BigInt(e.amountMoved))} MON</span> }] : []),
+          ...(e.status !== "executed" && e.detail !== "—" ? [{ k: "Ayrıntı", v: <span className="text-[12.5px] text-ink-2">{e.detail}</span> }] : []),
+          ...(e.amountMoved !== null ? [{ k: "Taşınan miktar", v: <span className="font-mono">{formatMon(BigInt(e.amountMoved))} MON</span> }] : []),
           ...(e.after && e.amountMoved !== null && v.action
             ? [
                 {
-                  k: "Vault before → after",
+                  k: "Kasa önce → sonra",
                   v: (() => {
                     const moved = BigInt(e.amountMoved!);
                     const after = { a: BigInt(e.after!.active), r: BigInt(e.after!.reserve) };
@@ -127,8 +128,8 @@ export function ActionPanel({ v }: { v: DecisionView }) {
                 },
               ]
             : []),
-          ...(e.startPrice ? [{ k: "Start price", v: <span className="font-mono">{e.startPrice} USD</span> }] : []),
-          ...(e.txs.length ? [{ k: "Transactions", v: <TxList txs={e.txs} /> }] : []),
+          ...(e.startPrice ? [{ k: "Başlangıç fiyatı", v: <span className="font-mono">{e.startPrice} USD</span> }] : []),
+          ...(e.txs.length ? [{ k: "İşlemler", v: <TxList txs={e.txs} /> }] : []),
         ]}
       />
     </Panel>
@@ -158,11 +159,11 @@ export function OutcomePanel({ v }: { v: DecisionView }) {
   const rep = v.settlement.reproduction;
   if (o.status !== "verified") {
     return (
-      <Panel title="Outcome (verify)">
+      <Panel title="Sonuç (doğrulama)">
         <KeyValue
           rows={[
-            { k: "Status", v: <StatusMark tone={tone}>{o.status}</StatusMark> },
-            { k: "Detail", v: <span className="text-[12.5px] text-ink-2">{o.detail}</span> },
+            { k: "Durum", v: <StatusMark tone={tone}>{outcomeLabel(o.status)}</StatusMark> },
+            { k: "Ayrıntı", v: <span className="text-[12.5px] text-ink-2">{o.detail}</span> },
           ]}
         />
       </Panel>
@@ -171,18 +172,18 @@ export function OutcomePanel({ v }: { v: DecisionView }) {
   return (
     <div className="border border-rule bg-surface">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule px-4 py-2.5">
-        <span className="text-[13px] font-semibold">Outcome (verify)</span>
-        <StatusMark tone={tone}>{o.success ? "success · expected = observed" : "miss · expected ≠ observed"}</StatusMark>
+        <span className="text-[13px] font-semibold">Sonuç (doğrulama)</span>
+        <StatusMark tone={tone}>{o.success ? "başarılı · beklenen = gözlenen" : "isabetsiz · beklenen ≠ gözlenen"}</StatusMark>
       </div>
       <div className="grid grid-cols-[96px_1fr_1fr] gap-x-3 border-b border-rule bg-surface-2 px-4 py-2">
         <span />
-        <span className="label">Expected</span>
-        <span className="label">Observed</span>
+        <span className="label">Beklenen</span>
+        <span className="label">Gözlenen</span>
       </div>
       {[
-        ["Action", <span key="e" className="font-mono">{o.expectedAction}</span>, <span key="o" className={`font-mono ${o.success ? "text-pass" : "text-fail"}`}>{o.observed}</span>],
-        ["Price", <span key="s" className="font-mono text-[12.5px]">{o.startPrice} USD <span className="block text-ink-3">at execution</span></span>, <span key="n" className="font-mono text-[12.5px]">{o.endPrice} USD <span className="block text-ink-3">after horizon</span></span>],
-        ["Move", <span key="b" className="font-mono text-[12.5px] text-ink-2">band ±{o.bandBps ?? "—"} bps</span>, <span key="m" className="font-mono text-[12.5px]">{o.moveBps} bps</span>],
+        ["Eylem", <span key="e" className="font-mono">{o.expectedAction}</span>, <span key="o" className={`font-mono ${o.success ? "text-pass" : "text-fail"}`}>{o.observed}</span>],
+        ["Fiyat", <span key="s" className="font-mono text-[12.5px]">{o.startPrice} USD <span className="block text-ink-3">yürütmede</span></span>, <span key="n" className="font-mono text-[12.5px]">{o.endPrice} USD <span className="block text-ink-3">ufuktan sonra</span></span>],
+        ["Hareket", <span key="b" className="font-mono text-[12.5px] text-ink-2">bant ±{o.bandBps ?? "—"} bps</span>, <span key="m" className="font-mono text-[12.5px]">{o.moveBps} bps</span>],
       ].map(([k, e, obs]) => (
         <div key={String(k)} className="grid grid-cols-[96px_1fr_1fr] gap-x-3 border-b border-rule px-4 py-2">
           <span className="label self-center">{k}</span>
@@ -192,13 +193,13 @@ export function OutcomePanel({ v }: { v: DecisionView }) {
       ))}
       <KeyValue
         rows={[
-          { k: "Verification source", v: <span className="text-[12.5px]">{o.source}</span> },
-          { k: "Recorded", v: <span className="font-mono text-[12.5px]">{o.resolvedAt ? formatUtc(o.resolvedAt) : "—"}</span> },
+          { k: "Doğrulama kaynağı", v: <span className="text-[12.5px]">{o.source}</span> },
+          { k: "Kaydedildi", v: <span className="font-mono text-[12.5px]">{o.resolvedAt ? formatUtc(o.resolvedAt) : "—"}</span> },
           ...(rep
             ? [
                 {
-                  k: "Recomputed",
-                  v: <StatusMark tone={rep.outcomeMatches ? "pass" : "fail"}>{rep.outcomeMatches ? "matches the recorded outcome" : "differs from the recorded outcome"}</StatusMark>,
+                  k: "Yeniden hesaplandı",
+                  v: <StatusMark tone={rep.outcomeMatches ? "pass" : "fail"}>{rep.outcomeMatches ? "kaydedilen sonuçla eşleşiyor" : "kaydedilen sonuçtan farklı"}</StatusMark>,
                 },
               ]
             : []),
@@ -218,17 +219,17 @@ function signed(wei: bigint) {
 function consequence(l: DecisionView["settlement"]["lines"][number]): string {
   if (!l.result) return "";
   const net = BigInt(l.net);
-  const prediction = l.choice ? `Predicted ${l.choice} with ${formatBps(l.probability ?? 0, 0)} confidence` : "Submitted no final decision";
-  const outcome = l.observed ? `the outcome made ${l.observed} correct` : "the outcome was recorded";
+  const prediction = l.choice ? `${formatBps(l.probability ?? 0, 0)} güvenle ${l.choice} tahmin etti` : "Nihai karar göndermedi";
+  const outcome = l.observed ? `sonuç ${l.observed} çatalını doğru kıldı` : "sonuç kaydedildi";
   const effect =
     l.result === "CORRECT"
-      ? `rewarded ${formatMon(BigInt(l.reward))} MON`
+      ? `${formatMon(BigInt(l.reward))} MON ödül`
       : l.result === "WRONG"
-        ? `penalised ${formatMon(BigInt(l.penalty))} MON`
+        ? `${formatMon(BigInt(l.penalty))} MON ceza`
         : l.result === "MISSED"
-          ? `penalised ${formatMon(BigInt(l.penalty))} MON for missing`
-          : "bond returned unchanged";
-  return `${prediction}; ${outcome}; ${l.result.toLowerCase()} → ${effect} (net ${signed(net)} MON).`;
+          ? `kaçırdığı için ${formatMon(BigInt(l.penalty))} MON ceza`
+          : "teminat değişmeden iade edildi";
+  return `${prediction}; ${outcome}; ${resultLabel(l.result).toLocaleLowerCase("tr-TR")} → ${effect} (net ${signed(net)} MON).`;
 }
 
 /**
@@ -240,9 +241,9 @@ export function SettlementPanel({ v }: { v: DecisionView }) {
   const s = v.settlement;
   if (s.lines.length === 0) {
     return (
-      <Panel title="Settlement">
+      <Panel title="Uzlaşma">
         <p className="px-4 py-4 text-[13px] text-ink-2">
-          <span className="mr-2 font-mono text-ink">{s.status === "na" ? "N/A" : s.status}</span>
+          <span className="mr-2 font-mono text-ink">{s.status === "na" ? "YOK" : settlementLabel(s.status)}</span>
           {s.detail}
         </p>
       </Panel>
@@ -253,15 +254,15 @@ export function SettlementPanel({ v }: { v: DecisionView }) {
   return (
     <div className="border border-rule bg-surface">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule px-4 py-2.5">
-        <span className="text-[13px] font-semibold">Settlement</span>
+        <span className="text-[13px] font-semibold">Uzlaşma</span>
         {settled && rep ? (
-          <StatusMark tone={rep.matches ? "pass" : "fail"}>{rep.matches ? "reproduced · matches" : "reproduction differs"}</StatusMark>
+          <StatusMark tone={rep.matches ? "pass" : "fail"}>{rep.matches ? "yeniden üretildi · eşleşiyor" : "yeniden üretim farklı"}</StatusMark>
         ) : (
-          <StatusMark tone={settled ? "pass" : "wait"}>{s.status.toLowerCase()}</StatusMark>
+          <StatusMark tone={settled ? "pass" : "wait"}>{settlementLabel(s.status).toLocaleLowerCase("tr-TR")}</StatusMark>
         )}
       </div>
       <div className="hidden grid-cols-[minmax(130px,1fr)_minmax(150px,1.2fr)_110px_110px_repeat(4,minmax(74px,auto))] gap-x-4 border-b border-rule bg-surface-2 px-4 py-2 md:grid">
-        {["Agent", "Predicted", "Actual", "Result", "Bond", "Penalty", "Reward", "Final"].map((h, i) => (
+        {["Ajan", "Tahmin", "Gerçekleşen", "Sonuç", "Teminat", "Ceza", "Ödül", "Nihai"].map((h, i) => (
           <span key={h} className={`label ${i >= 4 ? "text-right" : ""}`}>
             {h}
           </span>
@@ -274,31 +275,31 @@ export function SettlementPanel({ v }: { v: DecisionView }) {
             <li key={l.agentId} className="border-b border-rule px-4 py-3 last:border-b-0">
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px] md:grid-cols-[minmax(130px,1fr)_minmax(150px,1.2fr)_110px_110px_repeat(4,minmax(74px,auto))]">
                 <div className="col-span-2 font-medium md:col-span-1">{l.name}</div>
-                <Cell k="Predicted">
+                <Cell k="Tahmin">
                   {l.choice ? (
                     <span className="font-mono">
                       {l.choice}
                       <span className="block text-[11.5px] text-ink-3">
-                        score {l.score} · p {formatBps(l.probability ?? 0, 0)}
+                        skor {l.score} · p {formatBps(l.probability ?? 0, 0)}
                       </span>
                     </span>
                   ) : (
-                    <span className="text-ink-3">no decision</span>
+                    <span className="text-ink-3">karar yok</span>
                   )}
                 </Cell>
-                <Cell k="Actual">{l.observed ? <span className="font-mono">{l.observed}</span> : <span className="text-ink-3">{settled ? "—" : "pending"}</span>}</Cell>
-                <Cell k="Result">{l.result ? <StatusMark tone={resultTone(l.result)}>{l.result}</StatusMark> : <span className="text-[12px] text-ink-3">{s.status.toLowerCase()}</span>}</Cell>
-                <Cell k="Bond" right>{formatMon(BigInt(l.bond))}</Cell>
-                <Cell k="Penalty" right>{settled ? formatMon(BigInt(l.penalty)) : "—"}</Cell>
-                <Cell k="Reward" right>{settled ? formatMon(BigInt(l.reward)) : "—"}</Cell>
-                <Cell k="Final" right>
+                <Cell k="Gerçekleşen">{l.observed ? <span className="font-mono">{l.observed}</span> : <span className="text-ink-3">{settled ? "—" : "bekliyor"}</span>}</Cell>
+                <Cell k="Sonuç">{l.result ? <StatusMark tone={resultTone(l.result)}>{resultLabel(l.result)}</StatusMark> : <span className="text-[12px] text-ink-3">{settlementLabel(s.status).toLocaleLowerCase("tr-TR")}</span>}</Cell>
+                <Cell k="Teminat" right>{formatMon(BigInt(l.bond))}</Cell>
+                <Cell k="Ceza" right>{settled ? formatMon(BigInt(l.penalty)) : "—"}</Cell>
+                <Cell k="Ödül" right>{settled ? formatMon(BigInt(l.reward)) : "—"}</Cell>
+                <Cell k="Nihai" right>
                   {settled ? (
                     <span className={net > 0n ? "text-pass" : net < 0n ? "text-fail" : ""}>
                       {formatMon(BigInt(l.returned))}
                       <span className="block text-[11.5px]">{signed(net)}</span>
                     </span>
                   ) : (
-                    <span className="text-ink-3">{s.status === "LOCKED" ? "locked" : "returned"}</span>
+                    <span className="text-ink-3">{s.status === "LOCKED" ? "kilitli" : "iade edildi"}</span>
                   )}
                 </Cell>
               </div>
@@ -307,8 +308,8 @@ export function SettlementPanel({ v }: { v: DecisionView }) {
                   {consequence(l)}
                   {l.formula && (
                     <span className="mt-0.5 block font-mono text-[11.5px] text-ink-3">
-                      rule: {l.formula}
-                      {l.reproduced === false && <span className="text-fail"> · differs from the contract</span>}
+                      kural: {l.formula}
+                      {l.reproduced === false && <span className="text-fail"> · kontrattan farklı</span>}
                     </span>
                   )}
                 </p>
@@ -319,9 +320,9 @@ export function SettlementPanel({ v }: { v: DecisionView }) {
       </ul>
       {settled && rep && (
         <p className="border-t border-rule px-4 py-2 text-[11.5px] text-ink-3">
-          Outcome and settlement recomputed from on-chain inputs with the protocol rules and compared with what the contract recorded. Recomputed with OutcomeRegistry&apos;s current parameters (slash {formatBps(rep.params.slashBps, 0)}, miss {formatBps(rep.params.missPenaltyBps, 0)}).
-          {!rep.matches && ` ${rep.mismatches.join("; ")}. If an admin changed a parameter after settlement, the recorded values stand.`}
-          {" "}Final = bond − penalty + reward, credited to the agent&apos;s free bond on-chain.
+          Sonuç ve uzlaşma, zincir üstü girdilerden protokol kurallarıyla yeniden hesaplandı ve kontratın kaydettiğiyle karşılaştırıldı. OutcomeRegistry&apos;nin güncel parametreleri kullanıldı (kesinti {formatBps(rep.params.slashBps, 0)}, kaçırma {formatBps(rep.params.missPenaltyBps, 0)}).
+          {!rep.matches && ` ${rep.mismatches.join("; ")}. Bir yönetici uzlaşmadan sonra parametre değiştirdiyse kaydedilen değerler geçerlidir.`}
+          {" "}Nihai = teminat − ceza + ödül; zincir üstünde ajanın serbest teminatına yazılır.
         </p>
       )}
     </div>
@@ -346,11 +347,11 @@ export function StatePanel({ v, withInputs = true }: { v: DecisionView; withInpu
       <Panel>
         <KeyValue
           rows={[
-            { k: "State id", v: s.stateId ? <span className="font-mono text-[12.5px]">{s.stateId}</span> : muted("payload not available") },
-            { k: "State hash", v: s.hash ? <Hash value={s.hash} full /> : muted("—") },
-            { k: "Observed", v: s.timestamp ? <span className="font-mono text-[12.5px]">{formatUtc(s.timestamp)}</span> : muted("—") },
-            { k: "Sources", v: s.sources.length ? <span className="font-mono text-[12.5px]">{s.sources.join(" · ")}</span> : muted("—") },
-            { k: "Inputs", v: s.total !== null ? `${s.available} of ${s.total} available` : muted("payload not available; only the hash is on-chain") },
+            { k: "Durum kimliği", v: s.stateId ? <span className="font-mono text-[12.5px]">{s.stateId}</span> : muted("veri yükü mevcut değil") },
+            { k: "Durum hash'i", v: s.hash ? <Hash value={s.hash} full /> : muted("—") },
+            { k: "Gözlem zamanı", v: s.timestamp ? <span className="font-mono text-[12.5px]">{formatUtc(s.timestamp)}</span> : muted("—") },
+            { k: "Kaynaklar", v: s.sources.length ? <span className="font-mono text-[12.5px]">{s.sources.join(" · ")}</span> : muted("—") },
+            { k: "Girdiler", v: s.total !== null ? `${s.total} girdiden ${s.available} tanesi mevcut` : muted("veri yükü mevcut değil; zincirde yalnızca hash var") },
           ]}
         />
       </Panel>
@@ -364,7 +365,7 @@ export function QuestionsPanel({ v }: { v: DecisionView }) {
   if (!items) {
     return (
       <Panel>
-        <KeyValue rows={[{ k: "Questions hash", v: v.questions.hash ? <Hash value={v.questions.hash} full /> : muted("—") }, { k: "Questions", v: muted("payload not available; only the hash is on-chain") }]} />
+        <KeyValue rows={[{ k: "Soru hash'i", v: v.questions.hash ? <Hash value={v.questions.hash} full /> : muted("—") }, { k: "Sorular", v: muted("veri yükü mevcut değil; zincirde yalnızca hash var") }]} />
       </Panel>
     );
   }
@@ -379,9 +380,9 @@ export function QuestionsPanel({ v }: { v: DecisionView }) {
             <p className="mt-0.5 font-mono text-[11px] text-ink-3">{q.questionId}</p>
           </div>
           <div className="col-start-2 text-[12px] text-ink-2 md:col-start-auto md:text-right">
-            <p>{q.answeredBy.length === 5 ? "all five agents" : q.answeredBy.join(", ")}</p>
+            <p>{q.answeredBy.length === 5 ? "beş ajanın tümü" : q.answeredBy.join(", ")}</p>
             <p className="font-mono text-ink-3">
-              {q.availableInputs}/{q.inputs} inputs
+              {q.availableInputs}/{q.inputs} girdi
             </p>
           </div>
         </li>
@@ -395,20 +396,20 @@ export function QuestionsPanel({ v }: { v: DecisionView }) {
 export function TransitionsTable({ v }: { v: DecisionView }) {
   if (v.transitions.length === 0) return null;
   return (
-    <Table caption="Lifecycle transactions">
+    <Table caption="Yaşam döngüsü işlemleri">
       <thead>
         <tr>
-          <Th>Status</Th>
-          <Th>Call</Th>
-          <Th align="right">Block</Th>
-          <Th>Transaction</Th>
+          <Th>Durum</Th>
+          <Th>Çağrı</Th>
+          <Th align="right">Blok</Th>
+          <Th>İşlem</Th>
         </tr>
       </thead>
       <tbody>
         {v.transitions.map((t) => (
           <tr key={t.status}>
             <Td mono>{t.status}</Td>
-            <Td mono className="text-ink-2">{t.tx ? `${t.tx.contract}.${t.tx.functionName}` : "log not readable"}</Td>
+            <Td mono className="text-ink-2">{t.tx ? `${t.tx.contract}.${t.tx.functionName}` : "log okunamadı"}</Td>
             <Td align="right" mono>
               <a href={explorer.block(BigInt(t.blockNumber))} target="_blank" rel="noreferrer" className="underline decoration-rule underline-offset-2 hover:decoration-ink">
                 {t.blockNumber}
@@ -426,12 +427,12 @@ export function IntegrityPanel({ v }: { v: DecisionView }) {
   if (v.integrity.length === 0) return null;
   const tone = { VERIFIED: "pass", MISMATCH: "fail", UNAVAILABLE: "neutral" } as const;
   return (
-    <Table caption="Integrity checks">
+    <Table caption="Bütünlük kontrolleri">
       <thead>
         <tr>
-          <Th>Payload</Th>
-          <Th>On-chain commitment</Th>
-          <Th>Result</Th>
+          <Th>Veri yükü</Th>
+          <Th>Zincir üstü taahhüt</Th>
+          <Th>Sonuç</Th>
         </tr>
       </thead>
       <tbody>
@@ -440,7 +441,7 @@ export function IntegrityPanel({ v }: { v: DecisionView }) {
             <Td>{c.label}</Td>
             <Td>{c.onChain ? <Hash value={c.onChain} /> : muted("—")}</Td>
             <Td>
-              <StatusMark tone={tone[c.status]}>{c.status.toLowerCase()}</StatusMark>
+              <StatusMark tone={tone[c.status]}>{integrityLabel(c.status)}</StatusMark>
             </Td>
           </tr>
         ))}

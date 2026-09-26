@@ -1,6 +1,6 @@
 import "server-only";
 import { deployment } from "@/lib/chain/deployments";
-import { serverEnv } from "@/lib/config/server";
+import { invalidEnvVars, serverEnv } from "@/lib/config/server";
 import { providerStatus } from "@/lib/ai";
 import { AGENTS } from "@/lib/jev/agents";
 import { sessionsConfigured } from "@/lib/server/operator-session";
@@ -14,6 +14,8 @@ export interface Readiness {
   ai: { ok: boolean; detail: string };
   oracle: { ok: boolean; detail: string };
   signers: { ok: boolean; detail: string };
+  /** Variables that are set but malformed and therefore ignored (names only). */
+  invalidEnv: string[];
   ready: boolean;
   /** What a round can do right now. */
   mode: "live" | "simulation" | "unavailable";
@@ -33,21 +35,21 @@ export function readiness(): Readiness {
 
   const r = {
     contracts: d.deployed
-      ? { ok: true, detail: "All four contracts deployed" }
-      : { ok: false, detail: `Not deployed: ${d.missing.join(", ")}` },
+      ? { ok: true, detail: "Dört kontratın tümü dağıtıldı" }
+      : { ok: false, detail: `Dağıtılmamış: ${d.missing.join(", ")}` },
     ai: ai.configured
-      ? { ok: true, detail: `Provider configured (${ai.provider} · ${ai.model})` }
-      : { ok: false, detail: ai.reason ?? "AI provider not configured" },
+      ? { ok: true, detail: `Sağlayıcı yapılandırıldı (${ai.provider} · ${ai.model})` }
+      : { ok: false, detail: ai.reason ?? "AI sağlayıcı yapılandırılmamış" },
     oracle: env.PYTH_API_KEY
-      ? { ok: true, detail: "Pyth Hermes key configured" }
-      : { ok: false, detail: "PYTH_API_KEY not configured (required by Hermes since 2026-08-26)" },
+      ? { ok: true, detail: "Pyth Hermes anahtarı yapılandırıldı" }
+      : { ok: false, detail: "PYTH_API_KEY yapılandırılmamış (Hermes 2026-08-26'dan beri zorunlu tutuyor)" },
     signers: signersOk
-      ? { ok: true, detail: "Proposer, keeper and 5 agent operators configured" }
-      : { ok: false, detail: `${agentKeys}/5 agent operators, proposer ${env.PROPOSER_PRIVATE_KEY ? "set" : "missing"}, keeper ${env.KEEPER_PRIVATE_KEY ? "set" : "missing"}` },
+      ? { ok: true, detail: "Proposer, keeper ve 5 ajan operatörü yapılandırıldı" }
+      : { ok: false, detail: `${agentKeys}/5 ajan operatörü, proposer ${env.PROPOSER_PRIVATE_KEY ? "var" : "eksik"}, keeper ${env.KEEPER_PRIVATE_KEY ? "var" : "eksik"}` },
   };
   const ready = r.contracts.ok && r.ai.ok && r.oracle.ok && r.signers.ok;
   const simulation = r.ai.ok
-    ? { ok: true, reason: r.oracle.ok ? "Real state and real agents; execution, verification and settlement computed locally. No transactions." : "Runs up to the action; verification needs PYTH_API_KEY." }
+    ? { ok: true, reason: r.oracle.ok ? "Gerçek durum ve gerçek ajanlar; yürütme, doğrulama ve uzlaşma yerel olarak hesaplanır. İşlem yok." : "Eyleme kadar çalışır; doğrulama için PYTH_API_KEY gerekir." }
     : { ok: false, reason: r.ai.detail };
   const live = !r.ai.ok
     ? { ok: false, reason: r.ai.detail }
@@ -56,9 +58,9 @@ export function readiness(): Readiness {
       : !r.signers.ok
         ? { ok: false, reason: r.signers.detail }
         : !sessionsConfigured()
-          ? { ok: false, reason: "SESSION_SECRET not configured or shorter than 32 characters (operator sign-in)" }
-          : { ok: true, reason: r.oracle.ok ? "Every stage is a Monad Testnet transaction. Requires operator sign-in." : "Runs to approval; execution needs PYTH_API_KEY for a signed price." };
+          ? { ok: false, reason: "SESSION_SECRET yapılandırılmamış ya da 32 karakterden kısa (operatör girişi)" }
+          : { ok: true, reason: r.oracle.ok ? "Her aşama bir Monad Testnet işlemidir. Operatör girişi gerekir." : "Onaya kadar çalışır; yürütme imzalı fiyat için PYTH_API_KEY gerektirir." };
   const mode = live.ok ? "live" : simulation.ok ? "simulation" : "unavailable";
-  const modeDetail = mode === "live" ? live.reason : mode === "simulation" ? simulation.reason : "No AI provider is configured, so no agent can evaluate. Nothing is simulated.";
-  return { ...r, ready, mode, modeDetail, modes: { simulation, live } };
+  const modeDetail = mode === "live" ? live.reason : mode === "simulation" ? simulation.reason : "Hiçbir AI sağlayıcı yapılandırılmadığı için hiçbir ajan değerlendirme yapamaz. Hiçbir şey simüle edilmez.";
+  return { ...r, invalidEnv: invalidEnvVars(), ready, mode, modeDetail, modes: { simulation, live } };
 }

@@ -7,10 +7,10 @@ import { ok, unavailable, type Address, type Availability } from "@/lib/types/pr
 import { publicError } from "@/lib/server/public-error";
 
 export const CONTRACT_ROLES: Record<ContractName, string> = {
-  DecisionRegistry: "Agents, bonds, reward pool, decision records, lifecycle status, submissions",
-  DecisionEngine: "Deterministic aggregation, threshold, approval, guardian escalation",
-  ExecutionVault: "Treasury MON, ACTIVE/RESERVE buckets, bounded actions, start price",
-  OutcomeRegistry: "Pyth-verified outcome, correct fork, settlement computation",
+  DecisionRegistry: "Ajanlar, teminatlar, ödül havuzu, karar kayıtları, yaşam döngüsü durumu, gönderimler",
+  DecisionEngine: "Deterministik toplama, eşik, onay, guardian yükseltmesi",
+  ExecutionVault: "Hazine MON'u, ACTIVE/RESERVE kovaları, sınırlı eylemler, başlangıç fiyatı",
+  OutcomeRegistry: "Pyth ile doğrulanan sonuç, doğru çatal, uzlaşma hesabı",
 };
 
 export interface ContractStatus {

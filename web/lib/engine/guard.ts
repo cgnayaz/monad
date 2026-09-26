@@ -11,9 +11,9 @@ let lastStart = 0;
 
 export function acquireRun(): { ok: true; release: () => void } | { ok: false; reason: string; retryAfterSec: number } {
   const now = Date.now();
-  if (running) return { ok: false, reason: "A decision round is already running", retryAfterSec: 10 };
+  if (running) return { ok: false, reason: "Zaten çalışan bir karar turu var", retryAfterSec: 10 };
   const wait = lastStart + MIN_INTERVAL_MS - now;
-  if (wait > 0) return { ok: false, reason: "Rounds are rate limited", retryAfterSec: Math.ceil(wait / 1000) };
+  if (wait > 0) return { ok: false, reason: "Turlar hız sınırına takıldı", retryAfterSec: Math.ceil(wait / 1000) };
   running = true;
   lastStart = now;
   return { ok: true, release: () => void (running = false) };

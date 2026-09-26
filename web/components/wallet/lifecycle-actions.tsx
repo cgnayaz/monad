@@ -45,9 +45,9 @@ export function LifecycleActions({ ctx }: { ctx: LifecycleContext }) {
   switch (ctx.status) {
     case "OPEN":
       offer = {
-        actions: [{ action: { kind: "aggregate", decisionId: id }, label: "Aggregate" }],
+        actions: [{ action: { kind: "aggregate", decisionId: id }, label: "Topla" }],
         waitUntil: ctx.finalsSubmitted >= ctx.participants || ctx.deadline === null ? null : ctx.deadline + 1,
-        why: "Aggregation is permissionless once the submission window closes or everyone has submitted.",
+        why: "Gönderim penceresi kapandığında ya da herkes gönderdiğinde toplama izinsiz yapılabilir.",
       };
       break;
     case "AGGREGATED":
@@ -59,31 +59,31 @@ export function LifecycleActions({ ctx }: { ctx: LifecycleContext }) {
                 .filter(({ i }) => (ctx.allowedForks & (1 << i)) !== 0)
                 .map(({ f, i }) => ({ action: { kind: "guardianDecide", decisionId: id, choice: i as 0 | 1 | 2 }, label: `Guardian: ${f}` })),
               waitUntil: null,
-              why: `Agents escalated. Only a wallet holding GUARDIAN_ROLE can choose, until ${ctx.guardianDeadline ? formatUtc(ctx.guardianDeadline) : "—"}.`,
+              why: `Ajanlar yükseltti. Yalnızca GUARDIAN_ROLE sahibi bir cüzdan seçim yapabilir; son tarih: ${ctx.guardianDeadline ? formatUtc(ctx.guardianDeadline) : "—"}.`,
             }
           : {
-              actions: [{ action: { kind: "finalizeEscalation", decisionId: id }, label: "Finalize escalation (NO_ACTION)" }],
+              actions: [{ action: { kind: "finalizeEscalation", decisionId: id }, label: "Yükseltmeyi sonuçlandır (NO_ACTION)" }],
               waitUntil: ctx.guardianDeadline !== null ? ctx.guardianDeadline + 1 : null,
-              why: "The guardian window has closed; anyone can finalize the escalation as NO_ACTION.",
+              why: "Guardian penceresi kapandı; herkes yükseltmeyi NO_ACTION olarak sonuçlandırabilir.",
             };
       break;
     case "APPROVED":
       offer = {
-        actions: [{ action: { kind: "execute", decisionId: id }, label: "Execute approved action" }],
+        actions: [{ action: { kind: "execute", decisionId: id }, label: "Onaylanan eylemi yürüt" }],
         waitUntil: null,
-        why: "Anyone may execute; the vault runs only the approved branch. The wallet pays the Pyth fee.",
+        why: "Herkes yürütebilir; kasa yalnızca onaylanan dalı çalıştırır. Pyth ücretini cüzdan öder.",
       };
       break;
     case "EXECUTED":
       offer = {
-        actions: [{ action: { kind: "resolve", decisionId: id }, label: "Verify outcome" }],
+        actions: [{ action: { kind: "resolve", decisionId: id }, label: "Sonucu doğrula" }],
         waitUntil: t0 !== null ? t0 + 1 : null,
-        why: "After the horizon, a signed Pyth price published inside the window settles the decision.",
+        why: "Ufuk dolduktan sonra pencere içinde yayımlanan imzalı bir Pyth fiyatı kararı uzlaştırır.",
       };
       break;
   }
 
-  if (!offer) return <p className="text-[13px] text-ink-2">No further lifecycle step: the decision is {ctx.status.toLowerCase()}.</p>;
+  if (!offer) return <p className="text-[13px] text-ink-2">Başka yaşam döngüsü adımı yok: karar durumu {ctx.status}.</p>;
   const wait = offer.waitUntil !== null && now < offer.waitUntil ? offer.waitUntil - now : 0;
   const busy = tx.state.phase !== "idle" && tx.state.phase !== "confirmed" && tx.state.phase !== "failed";
 
@@ -96,7 +96,7 @@ export function LifecycleActions({ ctx }: { ctx: LifecycleContext }) {
     <div className="space-y-3">
       <div className="border border-rule bg-surface px-4 py-3">
         <p className="text-[13px]">
-          Next step: <span className="font-mono">{offer.actions.map((a) => ACTION_LABEL[a.action.kind]).filter((v, i, arr) => arr.indexOf(v) === i).join(" / ")}</span>
+          Sonraki adım: <span className="font-mono">{offer.actions.map((a) => ACTION_LABEL[a.action.kind]).filter((v, i, arr) => arr.indexOf(v) === i).join(" / ")}</span>
         </p>
         <p className="mt-0.5 text-[12.5px] text-ink-2">{offer.why}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -105,8 +105,8 @@ export function LifecycleActions({ ctx }: { ctx: LifecycleContext }) {
               {a.label}
             </Button>
           ))}
-          {!isConnected && <span className="text-[12.5px] text-ink-3">Connect a wallet (top right) to send it.</span>}
-          {wait > 0 && <span className="font-mono text-[12.5px] text-ink-2">available in {wait} s</span>}
+          {!isConnected && <span className="text-[12.5px] text-ink-3">Göndermek için bir cüzdan bağlayın (sağ üst).</span>}
+          {wait > 0 && <span className="font-mono text-[12.5px] text-ink-2">{wait} sn sonra kullanılabilir</span>}
         </div>
       </div>
       <TxLifecycle state={tx.state} />

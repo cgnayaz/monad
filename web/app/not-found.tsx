@@ -4,8 +4,8 @@ import { PageHeader } from "@/components/ui/layout";
 export default function NotFound() {
   return (
     <>
-      <PageHeader eyebrow="404" title="Not found" lead="There is no page or on-chain record at this address." />
-      <LinkButton href="/">Back to dashboard</LinkButton>
+      <PageHeader eyebrow="404" title="Bulunamadı" lead="Bu adreste bir sayfa ya da zincir üstü kayıt yok." />
+      <LinkButton href="/">Ana sayfaya dön</LinkButton>
     </>
   );
 }

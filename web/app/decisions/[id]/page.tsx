@@ -31,20 +31,20 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: PageProps<"/decisions/[id]">): Promise<Metadata> {
   const { id } = await props.params;
-  return { title: `Decision #${id}` };
+  return { title: `Karar #${id}` };
 }
 
 const SECTIONS = [
-  ["state", "State"],
-  ["questions", "Questions"],
-  ["decisions", "Agent decisions"],
-  ["aggregation", "Aggregation"],
-  ["action", "Action"],
-  ["transactions", "Transactions"],
-  ["outcome", "Outcome"],
-  ["settlement", "Accountability"],
-  ["integrity", "Integrity"],
-  ["provenance", "Provenance"],
+  ["state", "Durum"],
+  ["questions", "Sorular"],
+  ["decisions", "Ajan kararları"],
+  ["aggregation", "Toplama"],
+  ["action", "Eylem"],
+  ["transactions", "İşlemler"],
+  ["outcome", "Sonuç"],
+  ["settlement", "Hesap verebilirlik"],
+  ["integrity", "Bütünlük"],
+  ["provenance", "Köken izi"],
 ] as const;
 
 export default async function DecisionPage(props: PageProps<"/decisions/[id]">) {
@@ -55,8 +55,8 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
   if (res.status === "unavailable") {
     return (
       <>
-        <PageHeader eyebrow="Decision record" title={`Decision #${raw}`} />
-        {res.reason.startsWith("Contracts") ? <NotDeployed what="decision records" /> : <EmptyState title="Decision unavailable">{res.reason}</EmptyState>}
+        <PageHeader eyebrow="Karar kaydı" title={`Karar #${raw}`} />
+        {res.reason.startsWith("Contracts") ? <NotDeployed what="karar kaydı" /> : <EmptyState title="Karar okunamadı">{res.reason}</EmptyState>}
       </>
     );
   }
@@ -70,11 +70,11 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
   return (
     <>
       <PageHeader
-        eyebrow="Decision record · Monad Testnet"
-        title={`Decision #${d.decisionId}`}
+        eyebrow="Karar kaydı · Monad Testnet"
+        title={`Karar #${d.decisionId}`}
         lead={
           <span className="font-mono text-[13px]">
-            created {formatUtc(d.createdAt)} · proposer <a className="break-all underline decoration-rule underline-offset-2 hover:decoration-ink" href={explorer.address(d.proposer)} target="_blank" rel="noreferrer">{d.proposer}</a>
+            oluşturulma {formatUtc(d.createdAt)} · proposer <a className="break-all underline decoration-rule underline-offset-2 hover:decoration-ink" href={explorer.address(d.proposer)} target="_blank" rel="noreferrer">{d.proposer}</a>
           </span>
         }
         aside={<StatusMark tone={statusTone(d.status)}>{d.status}</StatusMark>}
@@ -108,7 +108,7 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
         <KeyFigures v={v} />
       </div>
 
-      <nav aria-label="Record sections" className="sticky top-0 z-10 -mx-4 mb-10 flex gap-x-5 overflow-x-auto border-b border-rule bg-bg/95 px-4 py-2.5 text-[13px] text-ink-2 [scrollbar-width:none] sm:-mx-6 sm:px-6">
+      <nav aria-label="Kayıt bölümleri" className="sticky top-0 z-10 -mx-4 mb-10 flex gap-x-5 overflow-x-auto border-b border-rule bg-bg/95 px-4 py-2.5 text-[13px] text-ink-2 [scrollbar-width:none] sm:-mx-6 sm:px-6">
         {SECTIONS.map(([anchor, label]) => (
           <a key={anchor} href={`#${anchor}`} className="whitespace-nowrap hover:text-ink">
             {label}
@@ -116,40 +116,40 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
         ))}
       </nav>
 
-      <Section id="state" index={n(0)} title="State" description="The snapshot the agents evaluated. Its hash was committed before any agent ran.">
+      <Section id="state" index={n(0)} title="Durum" description="Ajanların değerlendirdiği anlık görüntü. Hash'i hiçbir ajan çalışmadan önce zincire işlendi.">
         <StatePanel v={v} />
       </Section>
 
       <Section
         id="questions"
         index={n(1)}
-        title="Questions"
-        description={`${v.questions.items?.length ?? "—"} questions · allowed forks ${maskToForks(d.config.allowedForks).join(" · ")} · horizon ${formatDuration(d.config.horizon)} · band ±${d.config.bandBps} bps`}
+        title="Sorular"
+        description={`${v.questions.items?.length ?? "—"} soru · izinli çatallar ${maskToForks(d.config.allowedForks).join(" · ")} · ufuk ${formatDuration(d.config.horizon)} · bant ±${d.config.bandBps} bps`}
       >
         <QuestionsPanel v={v} />
       </Section>
 
-      <Section id="decisions" index={n(2)} title="Agent decisions" description={`Each participant's final decision as recorded on-chain, backed by a ${formatMon(d.config.lockPerAgent)} MON bond. Reasons appear when their text verifies against the on-chain hash.`}>
+      <Section id="decisions" index={n(2)} title="Ajan kararları" description={`Her katılımcının zincire kaydedilen nihai kararı; ${formatMon(d.config.lockPerAgent)} MON teminatla desteklenir. Gerekçeler, metinleri zincir üstü hash ile doğrulandığında görünür.`}>
         <AgentModules agents={v.agents} />
       </Section>
 
-      <Section id="aggregation" index={n(3)} title="Aggregation & threshold" description="Read from DecisionEngine; the same integer formula runs off-chain and can be reproduced from the submissions.">
+      <Section id="aggregation" index={n(3)} title="Toplama ve eşik" description="DecisionEngine'den okunur; aynı tamsayı formülü zincir dışında da çalışır ve gönderimlerden yeniden üretilebilir.">
         <div className="max-w-[720px]">
           <AggregationPanel v={v} />
         </div>
       </Section>
 
-      <Section id="action" index={n(4)} title="Bounded action">
+      <Section id="action" index={n(4)} title="Sınırlı eylem">
         <div className="max-w-[720px]">
           <ActionPanel v={v} />
         </div>
       </Section>
 
-      <Section id="transactions" index={n(5)} title="Transactions" description="Every lifecycle transition, the contract function that caused it (decoded from calldata) and its block.">
-        {v.transitions.length ? <TransitionsTable v={v} /> : <EmptyState title="No transitions readable" />}
+      <Section id="transactions" index={n(5)} title="İşlemler" description="Her yaşam döngüsü geçişi, ona neden olan kontrat fonksiyonu (calldata'dan çözülür) ve bloğu.">
+        {v.transitions.length ? <TransitionsTable v={v} /> : <EmptyState title="Okunabilir geçiş yok" />}
       </Section>
 
-      <Section id="outcome" index={n(6)} title="Outcome">
+      <Section id="outcome" index={n(6)} title="Sonuç">
         <div className="max-w-[720px]">
           <OutcomePanel v={v} />
         </div>
@@ -158,8 +158,8 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
       <Section
         id="settlement"
         index={n(7)}
-        title="Accountability"
-        description="What each agent predicted, what actually happened, whether it was right, and how its bond changed. Settlement follows fixed protocol rules; no model decides who deserves a reward."
+        title="Hesap verebilirlik"
+        description="Her ajanın ne tahmin ettiği, gerçekte ne olduğu, haklı çıkıp çıkmadığı ve teminatının nasıl değiştiği. Uzlaşma sabit protokol kurallarını izler; kimin ödülü hak ettiğine hiçbir model karar vermez."
       >
         <SettlementPanel v={v} />
       </Section>
@@ -167,18 +167,18 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
       <Section
         id="integrity"
         index={n(8)}
-        title="Integrity"
-        description={store.available ? `Off-chain payloads (${store.kind}) recomputed and compared with the on-chain commitments.` : `${store.reason}. On-chain values are shown without their payloads.`}
+        title="Bütünlük"
+        description={store.available ? `Zincir dışı veri yükleri (${store.kind}) yeniden hesaplandı ve zincir üstü taahhütlerle karşılaştırıldı.` : `${store.reason}. Zincir üstü değerler veri yükleri olmadan gösteriliyor.`}
       >
-        {v.integrity.length ? <IntegrityPanel v={v} /> : <EmptyState title="No checks" />}
+        {v.integrity.length ? <IntegrityPanel v={v} /> : <EmptyState title="Kontrol yok" />}
       </Section>
 
       <Section
         id="provenance"
         index={n(9)}
-        title="Provenance"
-        description="Each agent's final decision traced from state to settlement. Every link is checked against its neighbours on each load."
-        aside={<StatusMark tone={issues.length ? "fail" : "pass"}>{issues.length ? `${issues.length} inconsistencies` : "consistent"}</StatusMark>}
+        title="Köken izi"
+        description="Her ajanın nihai kararı durumdan uzlaşmaya kadar izlenir. Her halka, her yüklemede komşularına karşı kontrol edilir."
+        aside={<StatusMark tone={issues.length ? "fail" : "pass"}>{issues.length ? `${issues.length} tutarsızlık` : "tutarlı"}</StatusMark>}
       >
         {issues.length > 0 && (
           <ul className="mb-4 border border-fail px-4 py-3 text-[13px] text-fail">
@@ -190,13 +190,13 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-2">
           {d.participants.map((agentId) => (
             <div key={agentId} className="min-w-0">
-              <p className="mb-2 text-[13px] font-semibold">{v.agents.find((a) => a.agentId === agentId)?.name ?? `Agent ${agentId}`}</p>
+              <p className="mb-2 text-[13px] font-semibold">{v.agents.find((a) => a.agentId === agentId)?.name ?? `Ajan ${agentId}`}</p>
               <ProvenanceTrail steps={traceDecision(p, agentId)} />
             </div>
           ))}
         </div>
         <p className="mt-6 text-[12px] text-ink-3">
-          State hash <Hash value={d.stateHash} /> · questions hash <Hash value={d.questionsHash} />
+          Durum hash&apos;i <Hash value={d.stateHash} /> · soru hash&apos;i <Hash value={d.questionsHash} />
         </p>
       </Section>
     </>

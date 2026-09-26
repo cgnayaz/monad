@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { StatusMark } from "@/components/ui/status";
 import { formatBps, formatUtc } from "@/lib/format";
+import { settlementLabel } from "@/lib/i18n";
 import type { DecisionView } from "@/lib/view/decision-view";
 
 function Figure({ label, value, note }: { label: string; value: ReactNode; note?: ReactNode }) {
@@ -21,42 +22,42 @@ export function KeyFigures({ v }: { v: DecisionView }) {
   const share = g?.supportShareBps ?? null;
   return (
     <div className="grid grid-cols-2 divide-rule border border-rule bg-surface sm:grid-cols-4 [&>*]:border-rule max-sm:[&>*:nth-child(odd)]:border-r max-sm:[&>*:nth-child(n+3)]:border-t sm:[&>*:not(:nth-child(4n))]:border-r sm:[&>*:nth-child(n+5)]:border-t">
-      <Figure label="Selected choice" value={g ? g.leading : muted("—")} note={g ? `${g.submissions} decisions aggregated` : "not aggregated"} />
-      <Figure label="Aggregate score" value={g?.aggregateScore ?? muted("—")} note={`gate ${v.threshold.minActionScore} for actions`} />
-      <Figure label="Aggregate probability" value={g?.aggregateProbability != null ? formatBps(g.aggregateProbability, 1) : muted("—")} note="mean of backers" />
+      <Figure label="Seçilen çatal" value={g ? g.leading : muted("—")} note={g ? `${g.submissions} karar toplandı` : "toplanmadı"} />
+      <Figure label="Toplam skor" value={g?.aggregateScore ?? muted("—")} note={`eylemler için eşik ${v.threshold.minActionScore}`} />
+      <Figure label="Toplam olasılık" value={g?.aggregateProbability != null ? formatBps(g.aggregateProbability, 1) : muted("—")} note="destekçilerin ortalaması" />
       <Figure
-        label="Threshold"
+        label="Eşik"
         value={share !== null ? formatBps(share, 1) : muted("—")}
         note={
           g ? (
-            <StatusMark tone={g.passed ? "pass" : "fail"}>{g.passed ? `passed · ≥ ${formatBps(v.threshold.thresholdBps, 0)}` : `not met · ${formatBps(v.threshold.thresholdBps, 0)} req.`}</StatusMark>
+            <StatusMark tone={g.passed ? "pass" : "fail"}>{g.passed ? `geçti · ≥ ${formatBps(v.threshold.thresholdBps, 0)}` : `sağlanmadı · gereken ${formatBps(v.threshold.thresholdBps, 0)}`}</StatusMark>
           ) : (
-            `${formatBps(v.threshold.thresholdBps, 0)} of weighted support`
+            `ağırlıklı desteğin ${formatBps(v.threshold.thresholdBps, 0)}'i`
           )
         }
       />
-      <Figure label="Action" value={v.action ? v.action.fork : g?.guardianRequired ? "GUARDIAN" : muted("—")} note={v.action ? `${v.action.alias} · ${v.action.approvedBy}` : g?.guardianRequired ? "agents escalated" : "not approved"} />
+      <Figure label="Eylem" value={v.action ? v.action.fork : g?.guardianRequired ? "GUARDIAN" : muted("—")} note={v.action ? `${v.action.alias} · ${v.action.approvedBy}` : g?.guardianRequired ? "ajanlar yükseltti" : "onaylanmadı"} />
       <Figure
-        label="Execution"
-        value={v.execution.status === "executed" ? "EXECUTED" : v.execution.status === "not-submitted" ? muted("NOT SUBMITTED") : v.execution.status === "awaiting" ? "AWAITING" : muted("—")}
-        note={v.execution.status === "not-submitted" ? "simulation: no transaction" : v.execution.detail}
+        label="Yürütme"
+        value={v.execution.status === "executed" ? "YÜRÜTÜLDÜ" : v.execution.status === "not-submitted" ? muted("GÖNDERİLMEDİ") : v.execution.status === "awaiting" ? "BEKLİYOR" : muted("—")}
+        note={v.execution.status === "not-submitted" ? "simülasyon: işlem yok" : v.execution.detail}
       />
       <Figure
-        label="Outcome"
+        label="Sonuç"
         value={
           v.outcome.status === "verified" ? (
             <span className={v.outcome.success ? "text-pass" : "text-fail"}>{v.outcome.observed}</span>
           ) : v.outcome.status === "void" ? (
-            "VOID"
+            "GEÇERSİZ"
           ) : (
-            muted(v.outcome.status === "na" ? "N/A" : "PENDING")
+            muted(v.outcome.status === "na" ? "YOK" : "BEKLİYOR")
           )
         }
-        note={v.outcome.status === "verified" ? `${v.outcome.success ? "success" : "miss"} · ${v.outcome.moveBps} bps` : v.outcome.detail}
+        note={v.outcome.status === "verified" ? `${v.outcome.success ? "başarılı" : "isabetsiz"} · ${v.outcome.moveBps} bps` : v.outcome.detail}
       />
       <Figure
-        label="Settlement"
-        value={v.settlement.status === "na" ? muted("N/A") : v.settlement.status}
+        label="Uzlaşma"
+        value={v.settlement.status === "na" ? muted("YOK") : settlementLabel(v.settlement.status)}
         note={v.outcome.resolvedAt ? formatUtc(v.outcome.resolvedAt) : v.settlement.detail}
       />
     </div>

@@ -12,13 +12,13 @@ export default function ErrorPage({ error, retry }: { error: Error & { digest?: 
   return (
     <>
       <PageHeader
-        eyebrow="Error"
-        title="This page could not be loaded"
-        lead="A read from Monad Testnet or an internal service failed. On-chain data is never replaced with estimates, so the page stops here instead. Retrying usually works once the RPC responds again."
+        eyebrow="Hata"
+        title="Bu sayfa yüklenemedi"
+        lead="Monad Testnet ya da bir iç servisten okuma başarısız oldu. Zincir üstü veri hiçbir zaman tahminle değiştirilmez; bu yüzden sayfa burada durdu. RPC yeniden yanıt verdiğinde tekrar denemek genellikle işe yarar."
       />
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => retry()}>Try again</Button>
-        <LinkButton href="/">Back to dashboard</LinkButton>
+        <Button onClick={() => retry()}>Tekrar dene</Button>
+        <LinkButton href="/">Ana sayfaya dön</LinkButton>
         {error.digest && <span className="font-mono text-[12px] text-ink-3">ref {error.digest}</span>}
       </div>
     </>

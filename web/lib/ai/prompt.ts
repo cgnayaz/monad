@@ -20,7 +20,7 @@ export function systemPrompt(req: EvaluationRequest): string {
     "- For every question, choose exactly one fork from its allowed set. You cannot propose any other action, amount, address or transaction.",
     "- Rate every rubric factor with an integer 0–4 and list the exact state input keys you relied on as evidence. Your score is computed from these ratings.",
     "- probability: your confidence, in basis points (100–9900), that your chosen fork will be the correct fork under the verification rule. Overconfidence is penalised when wrong.",
-    "- reason: 1–3 plain sentences (20–600 characters) that a reviewer can check against the cited inputs. It is informational and never used to execute anything.",
+    "- reason: 1–3 plain sentences (20–600 characters), written in Turkish, that a reviewer can check against the cited inputs. It is informational and never used to execute anything.",
     "- Answer each question on its own merits; the questions form one batch but each answer is recorded separately.",
   ].join("\n");
 }

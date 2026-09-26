@@ -47,7 +47,7 @@ export function useOperatorSession() {
     try {
       const c = await fetch("/api/operator/challenge", { cache: "no-store" });
       const challenge = (await c.json()) as { message?: string; error?: string };
-      if (!c.ok || !challenge.message) throw new Error(challenge.error ?? "Challenge unavailable");
+      if (!c.ok || !challenge.message) throw new Error(challenge.error ?? "Giriş mesajı alınamadı");
       const signature = await signMessageAsync({ message: challenge.message });
       const res = await fetch("/api/operator/session", {
         method: "POST",
@@ -55,11 +55,11 @@ export function useOperatorSession() {
         body: JSON.stringify({ message: challenge.message, signature }),
       });
       const body = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(body.error ?? `Sign-in failed (${res.status})`);
+      if (!res.ok) throw new Error(body.error ?? `Giriş başarısız (${res.status})`);
       await refresh();
     } catch (err) {
       const e = classifyTxError(err);
-      setError(e.kind === "rejected" ? "Signature rejected in the wallet." : e.message);
+      setError(e.kind === "rejected" ? "İmza cüzdanda reddedildi." : e.message);
     } finally {
       setBusy(false);
     }
@@ -80,19 +80,19 @@ export function OperatorSessionBar({ session }: { session: ReturnType<typeof use
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12.5px]">
       {operator ? (
         <>
-          <StatusMark tone="pass">operator · {operator.role}</StatusMark>
+          <StatusMark tone="pass">operatör · <span lang="en">{operator.role}</span></StatusMark>
           <span className="font-mono text-ink-2">{shortHex(operator.address, 4, 4)}</span>
           <button type="button" onClick={signOut} className="text-ink-2 underline decoration-rule underline-offset-2 hover:text-ink">
-            Sign out
+            Çıkış yap
           </button>
         </>
       ) : (
         <>
-          <StatusMark tone="neutral">operator sign-in required</StatusMark>
+          <StatusMark tone="neutral">operatör girişi gerekli</StatusMark>
           <Button variant="secondary" onClick={signIn} disabled={!isConnected || busy}>
-            {busy ? "Waiting for signature…" : "Sign in with wallet"}
+            {busy ? "İmza bekleniyor…" : "Cüzdanla giriş yap"}
           </Button>
-          {!isConnected && <span className="text-ink-3">connect the admin or guardian wallet first</span>}
+          {!isConnected && <span className="text-ink-3">önce admin veya guardian cüzdanını bağlayın</span>}
         </>
       )}
       {error && <span className="text-fail">{error}</span>}

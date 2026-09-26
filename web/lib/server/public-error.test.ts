@@ -8,8 +8,8 @@ describe("publicError", () => {
 
   it("redacts secrets", () => {
     const pk = "0x" + "ab".repeat(32);
-    const msg = publicError(new Error(`failed sk-ant-api03-abcDEF_123 key ${pk} Bearer abc.def https://h/x?apikey=zzz&a=1`), "x");
-    expect(msg).not.toMatch(/sk-ant-api03|abababab|abc\.def|zzz/);
+    const msg = publicError(new Error(`failed sk-ant-api03-abcDEF_123 AIzaSyA1234567890abcdefghijklmnopqrstu key ${pk} Bearer abc.def https://h/x?apikey=zzz&a=1`), "x");
+    expect(msg).not.toMatch(/sk-ant-api03|AIzaSy|abababab|abc\.def|zzz/);
     expect(msg).toContain("?apikey=[redacted]&a=1");
   });
 

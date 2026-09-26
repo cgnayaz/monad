@@ -18,9 +18,9 @@ async function latestChainDecision(): Promise<{ view: DecisionView | null; note:
   const list = await listDecisions(1);
   if (list.status === "unavailable") return { view: null, note: `${list.reason}.` };
   const latest = list.value[0];
-  if (!latest) return { view: null, note: "No decision has been recorded on-chain yet." };
+  if (!latest) return { view: null, note: "Zincire henüz karar kaydedilmedi." };
   const c = await chainDecision(latest.id);
-  if (c.status !== "ok" || !c.value) return { view: null, note: c.status === "unavailable" ? c.reason : "Decision not found." };
+  if (c.status !== "ok" || !c.value) return { view: null, note: c.status === "unavailable" ? c.reason : "Karar bulunamadı." };
   return { view: c.value.view, note: "" };
 }
 
@@ -41,44 +41,44 @@ export default async function DashboardPage() {
     <>
       <PageHeader
         eyebrow="DecMarkt · Monad Testnet"
-        title="AI decisions with on-chain accountability."
-        lead="Jev structures each decision. DecMarkt bonds the agents that make it and applies fixed rules to their output. Monad enforces the bounded action and records the verified outcome."
+        title="Zincir üstünde hesap verebilir AI kararları."
+        lead="Jev her kararı yapılandırır. DecMarkt kararı veren ajanları teminata bağlar ve çıktılarına sabit kurallar uygular. Monad sınırlı eylemi uygular ve doğrulanmış sonucu kaydeder."
         aside={
           <div className="flex gap-3">
             <LinkButton href="/demo" variant="primary">
-              Run a round
+              Tur çalıştır
             </LinkButton>
-            <LinkButton href="/how-it-works">How it works</LinkButton>
+            <LinkButton href="/how-it-works">Nasıl çalışır</LinkButton>
           </div>
         }
       />
 
-      <Section title="Current decision">
+      <Section title="Güncel karar">
         <CurrentDecision chain={chain.view} chainNote={chain.note} />
       </Section>
 
       <Section
-        title="Current state"
-        description="Collected now from Pyth, Monad and the DecMarkt contracts. The next round commits exactly this snapshot (hash below) before any agent runs."
+        title="Güncel durum"
+        description="Şimdi Pyth, Monad ve DecMarkt kontratlarından toplandı. Bir sonraki tur, hiçbir ajan çalışmadan önce tam olarak bu anlık görüntüyü (aşağıdaki hash) zincire işler."
         aside={
           <Link href="/demo" className="text-[13px] text-ink-2 hover:text-ink">
-            Use it in a round →
+            Bir turda kullan →
           </Link>
         }
       >
         <div className="space-y-8">
           <div className="min-w-0">
-            <h3 className="mb-2.5 text-[13px] font-semibold">State</h3>
+            <h3 className="mb-2.5 text-[13px] font-semibold">Durum</h3>
             <StatePanel v={snapshot} />
           </div>
           <div className="min-w-0">
-            <h3 className="mb-2.5 text-[13px] font-semibold">Questions generated from it</h3>
+            <h3 className="mb-2.5 text-[13px] font-semibold">Bundan üretilen sorular</h3>
             <QuestionsPanel v={snapshot} />
           </div>
         </div>
       </Section>
 
-      <Section title="System" description="What a round can do right now. Presence of configuration only; secrets never reach the browser.">
+      <Section title="Sistem" description="Bir turun şu anda neler yapabildiği. Yalnızca yapılandırmanın varlığı gösterilir; gizli değerler asla tarayıcıya ulaşmaz.">
         <div className="max-w-[640px]">
           <ReadinessPanel r={r} />
         </div>
