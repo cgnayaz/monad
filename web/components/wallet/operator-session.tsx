@@ -13,6 +13,13 @@ export interface Operator {
   exp: number;
 }
 
+/** The signed-in operator from the session cookie; null when not signed in or unreachable. */
+async function currentOperator(): Promise<Operator | null> {
+  const res = await fetch("/api/operator/session", { cache: "no-store" }).catch(() => null);
+  if (!res?.ok) return null;
+  return ((await res.json()) as { operator: Operator | null }).operator;
+}
+
 /**
  * Operator sign-in: the connected wallet signs a server challenge; the server checks its
  * on-chain role (admin or guardian) and opens a 30-minute session. Required for anything
@@ -24,16 +31,11 @@ export function useOperatorSession() {
   const [busy, setBusy] = useState(false);
   const { signMessageAsync } = useSignMessage();
 
-  const refresh = useCallback(async () => {
-    const res = await fetch("/api/operator/session", { cache: "no-store" }).catch(() => null);
-    setOperator(res?.ok ? ((await res.json()) as Operator) : null);
-  }, []);
+  const refresh = useCallback(async () => setOperator(await currentOperator()), []);
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/operator/session", { cache: "no-store" })
-      .then(async (res) => (alive ? setOperator(res.ok ? ((await res.json()) as Operator) : null) : undefined))
-      .catch(() => undefined);
+    void currentOperator().then((op) => alive && setOperator(op));
     return () => {
       alive = false;
     };

@@ -4,6 +4,7 @@ import { publicClient } from "@/lib/chain/client";
 import { CONTRACT_NAMES, contractAddress, deployment, type ContractName } from "@/lib/chain/deployments";
 import { PYTH } from "@/lib/config/public";
 import { ok, unavailable, type Address, type Availability } from "@/lib/types/protocol";
+import { publicError } from "@/lib/server/public-error";
 
 export const CONTRACT_ROLES: Record<ContractName, string> = {
   DecisionRegistry: "Agents, bonds, reward pool, decision records, lifecycle status, submissions",
@@ -25,7 +26,7 @@ async function codeSize(address: Address): Promise<Availability<{ bytes: number 
     if (!code || code === "0x") return unavailable("No bytecode at address");
     return ok({ bytes: (code.length - 2) / 2 });
   } catch (err) {
-    return unavailable(err instanceof Error ? err.message.split("\n")[0] : "RPC read failed");
+    return unavailable(publicError(err, "RPC read failed"));
   }
 }
 
@@ -106,6 +107,6 @@ export async function liveParameters(): Promise<Availability<LiveParameters>> {
     ]);
     return ok({ roundReward, rewardPool, actionBps, maxMove, cooldown: BigInt(cooldown), slashBps, missPenaltyBps, vault: { active: balances[0], reserve: balances[1] } });
   } catch (err) {
-    return unavailable(err instanceof Error ? err.message.split("\n")[0] : "RPC read failed");
+    return unavailable(publicError(err, "RPC read failed"));
   }
 }

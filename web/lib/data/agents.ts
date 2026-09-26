@@ -4,6 +4,7 @@ import { publicClient } from "@/lib/chain/client";
 import { deployment } from "@/lib/chain/deployments";
 import { AGENTS, type AgentSpec } from "@/lib/jev/agents";
 import { ok, unavailable, type Address, type Availability } from "@/lib/types/protocol";
+import { publicError } from "@/lib/server/public-error";
 
 export interface AgentOnChain {
   operator: Address;
@@ -47,7 +48,7 @@ export async function listAgents(): Promise<AgentView[]> {
           }),
         };
       } catch (err) {
-        return { spec, onChain: unavailable(err instanceof Error ? err.message.split("\n")[0] : "read failed") };
+        return { spec, onChain: unavailable(publicError(err, "read failed")) };
       }
     }),
   );

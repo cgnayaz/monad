@@ -6,7 +6,7 @@ import { DEFAULT_PARAMS } from "@/lib/decmarkt/params";
 import { settle } from "@/lib/decmarkt/settlement";
 import type { Wire } from "@/lib/engine/wire";
 import { AGENTS } from "@/lib/jev/agents";
-import { correctFork, moveBps } from "@/lib/jev/verify";
+import { correctFork, moveBps } from "@/lib/jev/move";
 import type { Settlement } from "@/lib/model/accountability";
 import type { PipelineEvent } from "@/lib/model/final-decision";
 import { toProbability } from "@/lib/model/primitives";

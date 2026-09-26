@@ -29,7 +29,9 @@ let cached: ServerEnv | undefined;
 
 export function serverEnv(): ServerEnv {
   if (!cached) {
-    const parsed = ServerEnv.safeParse(process.env);
+    // An empty value (e.g. copied from .env.example) means "not configured", not "malformed".
+    const defined = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== undefined && v.trim() !== ""));
+    const parsed = ServerEnv.safeParse(defined);
     if (!parsed.success) {
       // Report which variables are malformed, never their values.
       const fields = parsed.error.issues.map((i) => i.path.join(".")).join(", ");

@@ -4,6 +4,7 @@ import { decisionRegistryAbi, executionVaultAbi } from "@/lib/chain/abis";
 import { publicClient } from "@/lib/chain/client";
 import { deployment } from "@/lib/chain/deployments";
 import { unavailableInput, type StateInput } from "@/lib/jev/state";
+import { publicError } from "@/lib/server/public-error";
 
 /** Vault, registry and track-record inputs. Unavailable until the contracts are deployed. */
 export async function collectProtocolInputs(now: number): Promise<StateInput[]> {
@@ -29,7 +30,7 @@ export async function collectProtocolInputs(now: number): Promise<StateInput[]> 
       { key: "record.decision_count", value: count.toString(), source: "decision-registry", sourceRef: ref, observedAt: now, status: "ok" },
     ];
   } catch (err) {
-    const note = err instanceof Error ? err.message.split("\n")[0] : "contract read failed";
+    const note = publicError(err, "contract read failed");
     return [
       unavailableInput("vault.active", "execution-vault", now, note, "MON"),
       unavailableInput("vault.reserve", "execution-vault", now, note, "MON"),

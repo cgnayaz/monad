@@ -29,6 +29,7 @@ import {
   type Hex,
   type Status,
 } from "@/lib/types/protocol";
+import { publicError } from "@/lib/server/public-error";
 
 /**
  * Chain read models. Every value comes from contract storage, logs or transactions;
@@ -52,7 +53,7 @@ function requireDeployment(): Availability<Deployed> {
 }
 
 function rpcReason(err: unknown): string {
-  return err instanceof Error ? `RPC read failed: ${err.message.split("\n")[0]}` : "RPC read failed";
+  return `RPC read failed: ${publicError(err, "unknown error")}`;
 }
 
 const executable = (f: Fork): Exclude<Fork, "ESCALATE"> => {

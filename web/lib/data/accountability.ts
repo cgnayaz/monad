@@ -16,6 +16,7 @@ import {
   type SettlementResult,
   type Status,
 } from "@/lib/types/protocol";
+import { publicError } from "@/lib/server/public-error";
 
 /**
  * Accountability reads. Everything here is contract storage: the penalty parameters and
@@ -32,7 +33,7 @@ export async function settlementParams(): Promise<Availability<SettlementParamsO
     ]);
     return ok({ slashBps, missPenaltyBps });
   } catch (err) {
-    return unavailable(err instanceof Error ? err.message.split("\n")[0] : "RPC read failed");
+    return unavailable(publicError(err, "RPC read failed"));
   }
 }
 
@@ -48,7 +49,7 @@ export async function verificationOracle(): Promise<Availability<{ pyth: Address
     ]);
     return ok({ pyth, priceId, toleranceSec: Number(tol) });
   } catch (err) {
-    return unavailable(err instanceof Error ? err.message.split("\n")[0] : "RPC read failed");
+    return unavailable(publicError(err, "RPC read failed"));
   }
 }
 
@@ -142,6 +143,6 @@ export async function agentLedger(agentId: number): Promise<Availability<AgentLe
       truncated: count > BigInt(MAX_SCAN),
     });
   } catch (err) {
-    return unavailable(err instanceof Error ? `RPC read failed: ${err.message.split("\n")[0]}` : "RPC read failed");
+    return unavailable(`RPC read failed: ${publicError(err, "unknown error")}`);
   }
 }

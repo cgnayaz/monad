@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { FORKS, PROBABILITY_MAX, PROBABILITY_MIN, SCORE_MAX, type Fork } from "@/lib/types/protocol";
 
 /**
@@ -9,20 +8,30 @@ import { FORKS, PROBABILITY_MAX, PROBABILITY_MIN, SCORE_MAX, type Fork } from "@
  */
 
 /** Choice — one value of the closed fork set. */
-export const ChoiceSchema = z.enum(FORKS);
 export type Choice = Fork;
 
+declare const brand: unique symbol;
+type Branded<T, B extends string> = T & { readonly [brand]: B };
+
 /** Score — deterministic evaluation, integer 0..10000. Never produced by a model directly. */
-export const ScoreSchema = z.number().int().min(0).max(SCORE_MAX).brand<"Score">();
-export type Score = z.infer<typeof ScoreSchema>;
+export type Score = Branded<number, "Score">;
 
 /** Probability — confidence in basis points, integer 100..9900. */
-export const ProbabilitySchema = z.number().int().min(PROBABILITY_MIN).max(PROBABILITY_MAX).brand<"Probability">();
-export type Probability = z.infer<typeof ProbabilitySchema>;
+export type Probability = Branded<number, "Probability">;
 
-export const toChoice = (v: unknown): Choice => ChoiceSchema.parse(v);
-export const toScore = (v: number): Score => ScoreSchema.parse(v);
-export const toProbability = (v: number): Probability => ProbabilitySchema.parse(v);
+// Plain range checks rather than a schema library: these parsers run in the browser too
+// (the demo recomputes settlement), and they are the only validation the client needs.
+function intInRange(v: unknown, min: number, max: number, name: string): number {
+  if (typeof v !== "number" || !Number.isInteger(v) || v < min || v > max) throw new RangeError(`${name} must be an integer in [${min}, ${max}], got ${String(v)}`);
+  return v;
+}
+
+export const toChoice = (v: unknown): Choice => {
+  if (typeof v !== "string" || !(FORKS as readonly string[]).includes(v)) throw new RangeError(`Choice must be one of ${FORKS.join(", ")}, got ${String(v)}`);
+  return v as Choice;
+};
+export const toScore = (v: number): Score => intInRange(v, 0, SCORE_MAX, "Score") as Score;
+export const toProbability = (v: number): Probability => intInRange(v, PROBABILITY_MIN, PROBABILITY_MAX, "Probability") as Probability;
 
 /** The three primitives every Jev decision carries. */
 export interface JevPrimitives {

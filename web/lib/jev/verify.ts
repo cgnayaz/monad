@@ -1,4 +1,4 @@
-import { BPS, type Fork, type Hex } from "@/lib/types/protocol";
+import { type Fork, type Hex } from "@/lib/types/protocol";
 import type { AgentDecision } from "@/lib/model/decision";
 import type { ObservedResult, OraclePrice, Outcome, VerificationSource } from "@/lib/model/outcome";
 import type { DecisionId, UnixSeconds } from "@/lib/model/primitives";
@@ -6,6 +6,7 @@ import type { QuestionSet } from "@/lib/model/question";
 import type { StateRecord } from "@/lib/model/state";
 import type { TxRef } from "@/lib/model/transaction";
 import { verifyBatchLeaf } from "./batch";
+import { correctFork, moveBps } from "./move";
 import { hashCanonical, hashText } from "./canonical";
 import { computeQuestionSetHash } from "./questions";
 import { computeStateHash } from "./state";
@@ -21,19 +22,7 @@ import { computeStateHash } from "./state";
 
 export type { Outcome, ObservedResult, OraclePrice, VerificationSource } from "@/lib/model/outcome";
 
-/** moveBps = (end − start) × 10000 / start, truncated toward zero like Solidity int division. */
-export function moveBps(startPrice: bigint, endPrice: bigint): bigint {
-  if (startPrice <= 0n) throw new Error("start price must be positive");
-  return ((endPrice - startPrice) * BigInt(BPS)) / startPrice;
-}
-
-export function correctFork(startPrice: bigint, endPrice: bigint, bandBps: number): Exclude<Fork, "ESCALATE"> {
-  const m = moveBps(startPrice, endPrice);
-  const band = BigInt(bandBps);
-  if (m < -band) return "DERISK";
-  if (m > band) return "DEPLOY";
-  return "NO_ACTION";
-}
+export { correctFork, moveBps };
 
 export function observe(start: OraclePrice, end: OraclePrice, bandBps: number): ObservedResult {
   if (start.expo !== end.expo) throw new Error("Price exponents differ");

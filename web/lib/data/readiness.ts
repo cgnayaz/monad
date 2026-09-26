@@ -2,6 +2,7 @@ import "server-only";
 import { deployment } from "@/lib/chain/deployments";
 import { serverEnv } from "@/lib/config/server";
 import { AGENTS } from "@/lib/jev/agents";
+import { sessionsConfigured } from "@/lib/server/operator-session";
 
 /**
  * What the live round needs, reported as presence flags only. Secret values never
@@ -52,8 +53,8 @@ export function readiness(): Readiness {
       ? { ok: false, reason: r.contracts.detail }
       : !r.signers.ok
         ? { ok: false, reason: r.signers.detail }
-        : !process.env.SESSION_SECRET
-          ? { ok: false, reason: "SESSION_SECRET not configured (operator sign-in)" }
+        : !sessionsConfigured()
+          ? { ok: false, reason: "SESSION_SECRET not configured or shorter than 32 characters (operator sign-in)" }
           : { ok: true, reason: r.oracle.ok ? "Every stage is a Monad Testnet transaction. Requires operator sign-in." : "Runs to approval; execution needs PYTH_API_KEY for a signed price." };
   const mode = live.ok ? "live" : simulation.ok ? "simulation" : "unavailable";
   const modeDetail = mode === "live" ? live.reason : mode === "simulation" ? simulation.reason : "No AI provider is configured, so no agent can evaluate. Nothing is simulated.";

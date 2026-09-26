@@ -6,7 +6,7 @@
 export const MONAD_TESTNET = {
   id: 10143,
   name: "Monad Testnet",
-  rpcUrl: process.env.NEXT_PUBLIC_MONAD_RPC_URL ?? "https://testnet-rpc.monad.xyz",
+  rpcUrl: process.env.NEXT_PUBLIC_MONAD_RPC_URL || "https://testnet-rpc.monad.xyz",
   explorerUrl: "https://testnet.monadexplorer.com",
   nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
 } as const;

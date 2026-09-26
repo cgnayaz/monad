@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, operatorFromCookie } from "@/lib/server/operator-session";
 import { chainExecutionLayer } from "@/lib/engine/runtime";
 import { toWireJson } from "@/lib/engine/wire";
+import { publicError } from "@/lib/server/public-error";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -26,6 +27,6 @@ export async function POST(_req: NextRequest, ctx: RouteContext<"/api/decisions/
     const result = await chain.layer.advance(id);
     return new Response(toWireJson(result), { headers: { "Content-Type": "application/json" } });
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message.split("\n")[0] : "Step failed" }, { status: 409 });
+    return Response.json({ error: publicError(err, "Step failed") }, { status: 409 });
   }
 }

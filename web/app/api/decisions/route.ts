@@ -7,6 +7,7 @@ import { toWireJson } from "@/lib/engine/wire";
 import type { PipelineEvent } from "@/lib/model/final-decision";
 import { SESSION_COOKIE, operatorFromCookie } from "@/lib/server/operator-session";
 import { clientKey, rateLimit, readJsonBody, tooMany } from "@/lib/server/rate-limit";
+import { publicError } from "@/lib/server/public-error";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
       try {
         await runDecisionPipeline(setup.deps, send);
       } catch (err) {
-        send({ type: "error", message: err instanceof Error ? err.message.split("\n")[0] : "Pipeline failed" });
+        send({ type: "error", message: publicError(err, "Pipeline failed") });
       } finally {
         lock.release();
         controller.close();

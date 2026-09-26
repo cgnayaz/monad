@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 
 const Body = z.object({ message: z.string().max(600), signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/) }).strict();
 
-/** GET — the current operator, if signed in. */
+/** GET — the current operator, or `{ operator: null }` when not signed in (not an error). */
 export async function GET() {
   const op = operatorFromCookie((await cookies()).get(SESSION_COOKIE)?.value);
-  return op ? Response.json(op) : Response.json({ error: "Not signed in" }, { status: 401 });
+  return Response.json({ operator: op }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /** POST {message, signature} — open a session for a wallet with an operator role on-chain. */

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { PYTH } from "@/lib/config/public";
 import { serverEnv } from "@/lib/config/server";
 import { unavailableInput, type StateInput } from "@/lib/jev/state";
+import { publicError } from "@/lib/server/public-error";
 
 /**
  * Pyth Hermes collector. Since the Pyth Core upgrade (2026-08-26) Hermes requires an
@@ -59,7 +60,7 @@ export async function collectPythInputs(now: number): Promise<StateInput[]> {
   try {
     latest = await fetchPrice("/v2/updates/price/latest");
   } catch (err) {
-    const note = err instanceof Error ? err.message : "Hermes unavailable";
+    const note = publicError(err, "Hermes unavailable");
     return [
       ...marketKeys.map((k) => unavailableInput(k, src, now, note)),
       ...historyWindows.map((w) => unavailableInput(w.key, src, now, note, "bps")),
@@ -74,7 +75,7 @@ export async function collectPythInputs(now: number): Promise<StateInput[]> {
     { key: "market.ref.ema_price", value: scaled(latest.ema), unit: "USD", source: src, sourceRef: `publishTime=${latest.ema.publish_time}`, observedAt: now, status: "ok" },
     {
       key: "market.ref.publish_age",
-      value: now - latest.price.publish_time,
+      value: Math.max(0, now - latest.price.publish_time), // now is floored to the second; never report a negative age
       unit: "s",
       source: src,
       sourceRef: ref,
@@ -101,7 +102,7 @@ export async function collectPythInputs(now: number): Promise<StateInput[]> {
         status: "ok",
       });
     } else {
-      inputs.push(unavailableInput(w.key, src, now, r.reason instanceof Error ? r.reason.message : "unavailable", "bps"));
+      inputs.push(unavailableInput(w.key, src, now, publicError(r.reason, "unavailable"), "bps"));
     }
   });
   return inputs;

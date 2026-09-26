@@ -70,18 +70,39 @@ own browser wallet, which can then act as guardian and admin from the UI. Budget
 
 ## 4. Web (Vercel)
 
-- Root directory: `web/`. Framework: Next.js. Node 24.
-- Server env (never `NEXT_PUBLIC_`): `ANTHROPIC_API_KEY`, `AI_MODEL`, `PYTH_API_KEY`, `PYTH_HERMES_URL`, `PROPOSER_PRIVATE_KEY`,
-  `AGENT_*_PRIVATE_KEY`, `KEEPER_PRIVATE_KEY`, `BLOB_READ_WRITE_TOKEN`, `DEMO_RATE_LIMIT`.
-- Public env: `NEXT_PUBLIC_MONAD_RPC_URL` (optional), contract addresses come
-  from the committed deployments JSON.
-- Round endpoints set `maxDuration` within the plan's limit; each call does one lifecycle
-  step, so no single invocation waits for all stages.
-- Payload store: Vercel Blob (public read, server write).
+Project settings: **Root Directory `web`**, framework Next.js (auto-detected), Node 24,
+build `next build` (default). No `vercel.json` is needed.
+
+Environment variables — the full annotated list is [web/.env.example](web/.env.example):
+
+| Variable | Kind | Needed for |
+|---|---|---|
+| `NEXT_PUBLIC_MONAD_RPC_URL` | public (optional) | browser + server RPC; default `https://testnet-rpc.monad.xyz` |
+| `ANTHROPIC_API_KEY` | secret | every round (simulation and live); the account needs credit |
+| `AI_MODEL` | config (optional) | default `claude-opus-5` |
+| `PYTH_API_KEY`, `PYTH_HERMES_URL` | secret / config | signed prices (execute, resolve, verification); key entitled to ETH/USD |
+| `SESSION_SECRET` | secret, ≥ 32 chars | operator sign-in; live mode is off without it |
+| `PROPOSER_PRIVATE_KEY`, `KEEPER_PRIVATE_KEY`, `AGENT_{RISK,YIELD,SECURITY,MARKET,HISTORY}_PRIVATE_KEY` | secret | live mode; must match the addresses in contracts/DEPLOYMENTS.md |
+| `BLOB_READ_WRITE_TOKEN` | secret | payload store (state, questions, reasons); created by connecting a Vercel Blob store |
+
+Only `NEXT_PUBLIC_MONAD_RPC_URL` reaches the browser. Chain id, explorer, contract addresses
+and the Pyth contract/feed are committed (`web/lib/chain/deployments.10143.json`,
+`web/lib/config/public.ts`) and were checked against the chain on 2026-09-26. Empty variables
+count as not configured; the dashboard shows which mode (live / simulation / unavailable) the
+deployment can run and why.
+
+Runtime notes:
+- `POST /api/decisions` streams one round up to submission/aggregation (`maxDuration` 300 s:
+  state collection, ≤ 60 s agent timeout, transactions). Later lifecycle steps are separate
+  calls (`/advance`, or any wallet on the decision page), so no invocation waits for the horizon.
+- One running round per instance; rate limits are per instance (SECURITY_AUDIT.md L-4).
+- Without `BLOB_READ_WRITE_TOKEN` in production, rounds still run and hashes are on chain,
+  but reasons cannot be shown; the round reports "payload store not configured".
 
 ```bash
-cd web && npm run build          # must pass locally
-vercel link && vercel env pull   # once
+cd web && npm run check          # typecheck, lint, tests, production build — must pass
+vercel link                      # once; set Root Directory to web
+vercel env add <NAME> production # for each secret above (or in the dashboard)
 vercel --prod
 ```
 
@@ -95,8 +116,8 @@ The deployments file is restored afterwards. Uses anvil's public development key
 
 ## 6. Release checklist
 
-- [ ] `forge test` green, invariants fuzzed.
-- [ ] `guvenlik-denetcisi` review; findings fixed or documented in SECURITY_MODEL.md.
+- [ ] `forge test` green (unit + fuzz); `web/scripts/fork-pyth.sh` passes against the live deployment.
+- [ ] `guvenlik-denetcisi` review; findings fixed or documented in SECURITY_AUDIT.md.
 - [ ] `git ls-files` contains no `.env*` besides `.env.example`; no private keys in history.
 - [ ] Contracts source-verified; addresses in `/contracts` match explorer.
 - [ ] One full real round resolved on the production deployment.

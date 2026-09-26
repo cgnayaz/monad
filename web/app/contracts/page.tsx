@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Contracts" };
 export const dynamic = "force-dynamic";
 
 const ROLES = [
-  ["DEFAULT_ADMIN_ROLE", "Deployer (testnet)", "Set parameters within hard caps, pause, grant roles"],
+  ["DEFAULT_ADMIN_ROLE", "Deployer and operator wallet", "Set parameters within hard caps, pause, grant roles; withdraw only while paused"],
   ["PROPOSER_ROLE", "Server proposer key", "Create and open decisions; cancel before aggregation"],
   ["GUARDIAN_ROLE", "Human wallet", "Choose a bounded action when agents escalate"],
   ["ENGINE_ROLE", "DecisionEngine", "OPEN → AGGREGATED → APPROVED, or CANCELLED on missing quorum"],

@@ -95,6 +95,9 @@ never reaches this path, and no action takes an address, an amount or calldata f
 - One running round per instance and a 30 s minimum interval (HTTP 429 with Retry-After);
   per-client rate limits on simulation rounds (3 / 10 min), oracle routes and reads.
 - Security headers on every route (CSP, frame-ancestors none, nosniff); see SECURITY_AUDIT.md.
+- Errors shown to the browser pass through `publicError` (`web/lib/server/public-error.ts`):
+  first line only, secrets (API keys, 32-byte hex, bearer tokens, key query params) redacted,
+  length-bounded. Page failures render `app/error.tsx` with Next's digest, never a stack trace.
 - The server never accepts a fork, amount, address or calldata from the browser.
 - Guardian decisions are signed by the guardian's own wallet in the browser, not by the server.
 

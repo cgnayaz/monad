@@ -1,6 +1,7 @@
 import { latestPrice, priceAt } from "@/lib/collectors/pyth";
 
 import { clientKey, rateLimit, tooMany } from "@/lib/server/rate-limit";
+import { publicError } from "@/lib/server/public-error";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,6 @@ export async function GET(req: Request) {
     const p = at ? await priceAt(Number(at)) : await latestPrice();
     return Response.json(p, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : "Oracle unavailable" }, { status: 503 });
+    return Response.json({ error: publicError(err, "Oracle unavailable") }, { status: 503 });
   }
 }

@@ -23,6 +23,7 @@ import type { StateRecord } from "@/lib/model/state";
 import type { TxRef } from "@/lib/model/transaction";
 import { FORKS, type Status } from "@/lib/types/protocol";
 import type { ExecutionLayer, PayloadSink, ReputationRecords } from "./ports";
+import { publicError } from "@/lib/server/public-error";
 
 /**
  * The Jev decision pipeline (JEV_INTEGRATION.md §12).
@@ -325,6 +326,5 @@ function describe(e: ExecutionHandoff): string {
 }
 
 function errMessage(err: unknown): string {
-  if (err instanceof Error) return err.message.split("\n")[0];
-  return "unknown error";
+  return publicError(err, "unknown error");
 }

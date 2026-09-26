@@ -51,8 +51,12 @@ export class AnthropicProvider implements DecisionProvider {
       if (err instanceof Anthropic.RateLimitError) throw new ProviderError("provider_error", "Provider rate limit reached");
       if (err instanceof Anthropic.APIConnectionTimeoutError) throw new ProviderError("timeout", "Provider connection timed out");
       if (err instanceof Anthropic.APIConnectionError) throw new ProviderError("provider_error", "Could not reach the provider");
+      if (err instanceof Anthropic.PermissionDeniedError) throw new ProviderError("provider_error", "Provider denied access for this key");
+      if (err instanceof Anthropic.NotFoundError) throw new ProviderError("provider_error", `Model ${this.model} is not available for this key`);
+      if (err instanceof Anthropic.BadRequestError && /credit balance/i.test(err.message)) throw new ProviderError("provider_error", "Provider account has no credit left");
+      if (err instanceof Anthropic.InternalServerError) throw new ProviderError("provider_error", `Provider is unavailable (HTTP ${err.status})`);
       if (err instanceof Anthropic.APIError) throw new ProviderError("provider_error", `Provider returned HTTP ${err.status ?? "error"}`);
-      throw new ProviderError("provider_error", err instanceof Error ? err.message : "Unknown provider error");
+      throw new ProviderError("provider_error", "Unknown provider error");
     }
 
     if (message.stop_reason === "refusal") throw new ProviderError("refusal", "The model declined to answer", message.model);
