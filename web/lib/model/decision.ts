@@ -51,7 +51,25 @@ export interface DecisionBatch {
   leaves: BatchLeaf[];
 }
 
-export type RunValidation = { ok: true } | { ok: false; errors: string[] };
+/**
+ * Why an agent produced no usable decision. Every failure is recorded and shown; a failed
+ * agent submits nothing and is settled as MISSED on-chain.
+ */
+export const AGENT_FAILURE_KINDS = [
+  "timeout", // no response within the agent time limit
+  "provider_error", // network / HTTP / authentication / rate-limit failure
+  "invalid_json", // response text is not JSON
+  "schema_violation", // JSON that fails the strict schema or the semantic checks
+  "refusal", // the model declined to answer
+  "truncated", // output hit the token limit
+] as const;
+export type AgentFailureKind = (typeof AGENT_FAILURE_KINDS)[number];
+
+export interface AgentFailure {
+  kind: AgentFailureKind;
+  message: string;
+  details: string[]; // e.g. individual schema violations
+}
 
 /** Provenance of one agent's independent evaluation. */
 export interface AgentRun {
@@ -65,8 +83,11 @@ export interface AgentRun {
   startedAt: number; // ms
   finishedAt: number; // ms
   rawOutputHash: Hex | null;
-  validation: RunValidation;
-  batch: DecisionBatch | null; // null when validation failed
+  status: "ok" | "failed";
+  failure: AgentFailure | null; // set exactly when status is "failed"
+  /** The state input keys this agent received (the slice relevant to its questions). */
+  inputKeys: string[];
+  batch: DecisionBatch | null; // null when failed
   /** The agent's final decision: its answer to the ACTION question. */
   final: AgentDecision | null;
 }

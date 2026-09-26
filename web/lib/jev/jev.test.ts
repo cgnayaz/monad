@@ -8,9 +8,9 @@ import { previewAction, resolveAction } from "./action";
 import { buildDecisionBatch, verifyBatchLeaf } from "./batch";
 import { forkSpace, forksToMask, maskToForks, parseFork } from "./forks";
 import { toAgentDecision } from "./primitives";
-import { assignedQuestions, buildQuestionSet, questionByIndex, QUESTION_TEMPLATES } from "./questions";
+import { assignedQuestions, buildQuestionSet, questionByIndex, QUESTION_TEMPLATES, relevantInputKeys } from "./questions";
 import { computeScore } from "./score";
-import { buildState, computeStateHash, type StateInput } from "./state";
+import { buildState, computeStateHash, sliceState, type StateInput } from "./state";
 import { buildOutcome, checkQuestionSet, checkState, correctFork, moveBps, observe } from "./verify";
 
 const NOW = 1_790_000_000;
@@ -100,7 +100,8 @@ describe("Model output validation", () => {
     factors: questionByIndex(set, questionIndex).rubric.map((f) => ({ factor: f.factor, rating: 2, evidence })),
     reason: "Price is inside the band and no input suggests a directional move.",
   });
-  const check = (answers: unknown[]) => validateModelOutput({ answers }, { state, assigned }).ok;
+  const slice = sliceState(state, relevantInputKeys(assigned));
+  const check = (answers: unknown[]) => validateModelOutput({ answers }, { state: slice, assigned }).ok;
 
   it("accepts a well-formed batch", () => expect(check([answer(1), answer(0)])).toBe(true));
   it("rejects invented evidence, extra questions, bad ranges, unknown forks and calldata", () => {

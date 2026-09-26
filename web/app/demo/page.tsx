@@ -4,29 +4,19 @@ import { ForkTable } from "@/components/domain/fork-table";
 import { QuestionList } from "@/components/domain/question-list";
 import { ReadinessPanel } from "@/components/domain/readiness-panel";
 import { StateTable } from "@/components/domain/state-table";
-import { Button } from "@/components/ui/button";
+import { RoundRunner } from "@/components/domain/round/round-runner";
 import { Hash } from "@/components/ui/hash";
-import { KeyValue, PageHeader, Panel, Section } from "@/components/ui/layout";
+import { KeyValue, PageHeader, Section } from "@/components/ui/layout";
 import { StatusMark } from "@/components/ui/status";
 import { collectState } from "@/lib/collectors";
 import { listAgents } from "@/lib/data/agents";
 import { readiness } from "@/lib/data/readiness";
 import { formatDuration, formatUtc } from "@/lib/format";
 import { buildQuestionSet } from "@/lib/jev/questions";
-import { DEFAULT_PARAMS } from "@/lib/decmarkt/params";
 
 export const metadata: Metadata = { title: "Live demo" };
 export const dynamic = "force-dynamic";
 
-const STAGES = [
-  { status: "CREATED", step: "Snapshot state and commit hashes", by: "Proposer → DecisionRegistry.createDecision" },
-  { status: "OPEN", step: "Lock bonds, open submission window", by: "Proposer → DecisionRegistry.openDecision" },
-  { status: "OPEN", step: "Five agents decide in parallel and submit", by: "Agent operators → DecisionRegistry.submitBatch" },
-  { status: "AGGREGATED", step: "Aggregate and evaluate threshold", by: "Keeper → DecisionEngine.aggregate" },
-  { status: "APPROVED", step: "Approve bounded action (guardian if escalated)", by: "DecisionEngine" },
-  { status: "EXECUTED", step: "Execute approved fork, record start price", by: "Keeper → ExecutionVault.execute" },
-  { status: "RESOLVED", step: "Verify outcome after horizon, settle bonds", by: "Keeper → OutcomeRegistry.resolve" },
-] as const;
 
 export default async function DemoPage() {
   const [state, agents] = await Promise.all([collectState(), listAgents()]);
@@ -39,40 +29,16 @@ export default async function DemoPage() {
       <PageHeader
         eyebrow="Live demo · Monad Testnet"
         title="Run an accountable decision round"
-        lead="Every stage below is a real transaction on Monad Testnet. The state is snapshotted and committed before any agent runs; agents choose only among bounded forks; settlement follows from a verified oracle outcome."
+        lead="The state is snapshotted and committed before any agent runs; five analysts decide in parallel among bounded forks; fixed rules aggregate their decisions, apply the threshold and select the action; the execution layer carries it out on Monad."
       />
 
-      <div className="mb-14 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Panel title="Round stages">
-          <ol>
-            {STAGES.map((s, i) => (
-              <li key={s.step} className="grid grid-cols-[32px_1fr] gap-x-3 border-b border-rule px-4 py-3 last:border-b-0 sm:grid-cols-[32px_1fr_120px]">
-                <span className="font-mono text-[12px] text-ink-3">{String(i + 1).padStart(2, "0")}</span>
-                <div>
-                  <p>{s.step}</p>
-                  <p className="font-mono text-[11.5px] text-ink-3">{s.by}</p>
-                </div>
-                <span className="col-start-2 font-mono text-[11px] tracking-[0.04em] text-ink-2 sm:col-start-auto sm:text-right">{s.status}</span>
-              </li>
-            ))}
-          </ol>
-          <div className="flex flex-wrap items-center gap-4 border-t border-rule px-4 py-4">
-            <Button disabled={!r.ready} aria-describedby="start-note">
-              Start round
-            </Button>
-            <p id="start-note" className="text-[13px] text-ink-2">
-              {r.ready
-                ? `Submission window ${formatDuration(DEFAULT_PARAMS.submissionWindowSec)}, horizon ${formatDuration(DEFAULT_PARAMS.horizonSec)}.`
-                : "Unavailable until every readiness check passes. No round is simulated."}
-            </p>
-          </div>
-        </Panel>
-        <ReadinessPanel r={r} />
+      <div className="mb-14">
+        <RoundRunner mode={r.mode} modeDetail={r.modeDetail} aside={<ReadinessPanel r={r} />} />
       </div>
 
       <Section
         index="01"
-        title="Jev state — live snapshot"
+        title="Jev state — current snapshot"
         description={
           <>
             Collected now from its sources. This is a <strong className="font-medium text-ink">preview</strong>: it is

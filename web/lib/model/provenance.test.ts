@@ -50,7 +50,9 @@ function fixture(): DecisionProvenance {
         startedAt: 0,
         finishedAt: 0,
         rawOutputHash: null,
-        validation: { ok: true },
+        status: "ok",
+        failure: null,
+        inputKeys: [],
         batch,
         final: batch.decisions.find((d) => d.questionIndex === 0)!,
       };

@@ -133,7 +133,8 @@ Browser (judge / user)
   │  writes (optional): wallet → guardian decision on ESCALATE
   ▼
 Next.js on Vercel (server)
-  ├─ /api/rounds/*        idempotent step endpoints; each step reads on-chain status first
+  ├─ POST /api/decisions               run the Jev pipeline, stream NDJSON events
+  ├─ POST /api/decisions/:id/advance   next due lifecycle step, chosen from on-chain status
   ├─ StateCollector       Pyth Hermes, Monad RPC
   ├─ DecisionProvider     AI model calls (server-side key)
   └─ Signers              PROPOSER key, 5 AGENT operator keys, KEEPER key (server env only)

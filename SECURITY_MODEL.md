@@ -64,13 +64,24 @@ All keys are **testnet-only** and hold small balances.
   only match public hashes (reviewed), and `gitleaks`-style grep for `sk-ant-`.
 - Each agent key holds only gas + bond; the proposer key holds gas only.
 
-## 6. Server input validation
+## 6. What the AI layer can and cannot do
 
-- All API route bodies validated with Zod; round endpoints take only a `decisionId`.
+The model returns text. The Jev layer parses and validates it into enum choices, integer
+ratings, a bounded probability and a reason. The AI layer cannot sign (no key reaches it),
+execute (only the execution layer calls contracts, from fixed functions), change thresholds
+or contract rules (parameters are server constants and on-chain config set by the proposer
+before any agent runs), or generate calldata (every call is assembled from validated
+fields). Aggregation and the action are deterministic code; the on-chain aggregation is
+compared with the local one and execution is withheld on any mismatch.
+
+## 7. Server input validation
+
+- `POST /api/decisions` ignores the request body entirely; `/advance` takes only a numeric id.
+- One running round per instance and a 30 s minimum interval (HTTP 429 with Retry-After).
 - The server never accepts a fork, amount, address or calldata from the browser.
 - Guardian decisions are signed by the guardian's own wallet in the browser, not by the server.
 
-## 7. Review gates
+## 8. Review gates
 
 - Security review by the repo agent `guvenlik-denetcisi` before first testnet deploy and before submission.
 - `forge test` + fuzz green, `forge coverage` reported.

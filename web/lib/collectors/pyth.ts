@@ -106,3 +106,43 @@ export async function collectPythInputs(now: number): Promise<StateInput[]> {
   });
   return inputs;
 }
+
+// ─── Signed update data for on-chain verification ─────────────────────────
+
+const UpdateResponse = z.object({
+  binary: z.object({ encoding: z.literal("hex"), data: z.array(z.string().regex(/^(0x)?[0-9a-fA-F]+$/)).min(1) }),
+  parsed: z.array(z.object({ price: PriceSchema })).min(1),
+});
+
+export interface PriceUpdate {
+  data: `0x${string}`[]; // bytes[] for IPyth.parsePriceFeedUpdates
+  publishTime: number;
+}
+
+async function fetchUpdate(path: string): Promise<PriceUpdate> {
+  const env = serverEnv();
+  if (!env.PYTH_API_KEY) throw new Error("PYTH_API_KEY is not configured; signed price updates are unavailable");
+  const url = `${env.PYTH_HERMES_URL}${path}?ids%5B%5D=${PYTH.monUsdFeedId}&encoding=hex&parsed=true`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${env.PYTH_API_KEY}` },
+    signal: AbortSignal.timeout(8_000),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Hermes responded ${res.status}`);
+  const body = UpdateResponse.parse(await res.json());
+  return {
+    data: body.binary.data.map((d) => (d.startsWith("0x") ? d : `0x${d}`) as `0x${string}`),
+    publishTime: body.parsed[0].price.publish_time,
+  };
+}
+
+/** Latest signed MON/USD update (for ExecutionVault.execute). */
+export function latestPriceUpdate(): Promise<PriceUpdate> {
+  return fetchUpdate("/v2/updates/price/latest");
+}
+
+/** Signed MON/USD update published at or after `timestamp` (for OutcomeRegistry.resolve). */
+export function priceUpdateAt(timestamp: number): Promise<PriceUpdate> {
+  return fetchUpdate(`/v2/updates/price/${timestamp}`);
+}
+

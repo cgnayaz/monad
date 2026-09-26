@@ -2,6 +2,7 @@ import type { Hex } from "@/lib/types/protocol";
 import {
   STATE_VERSION,
   type StateId,
+  type StateSlice,
   type StateInput,
   type StateRecord,
   type StateSource,
@@ -16,7 +17,7 @@ import { hashCanonical } from "./canonical";
  * structured, versioned, traceable per input, and hashed.
  */
 
-export type { StateInput, StateRecord, StateSource, StateSubject } from "@/lib/model/state";
+export type { StateInput, StateRecord, StateSlice, StateSource, StateSubject } from "@/lib/model/state";
 
 /**
  * Build a StateRecord. Inputs are sorted by key and sources de-duplicated so that the
@@ -36,6 +37,23 @@ export function computeStateHash(state: StateRecord): Hex {
   const { hash: _omit, ...body } = state;
   void _omit;
   return hashCanonical(body);
+}
+
+/** Input keys of the state that match any of the given prefixes (or exact keys). */
+export function resolveInputKeys(state: StateRecord, prefixes: readonly string[]): string[] {
+  return state.data.inputs.map((i) => i.key).filter((k) => prefixes.some((p) => k === p || k.startsWith(p)));
+}
+
+/** The relevant part of a state for a set of input keys. */
+export function sliceState(state: StateRecord, keys: readonly string[]): StateSlice {
+  const wanted = new Set(keys);
+  return {
+    stateId: state.stateId,
+    stateHash: state.hash,
+    timestamp: state.timestamp,
+    subject: state.data.subject,
+    inputs: state.data.inputs.filter((i) => wanted.has(i.key)),
+  };
 }
 
 export function availableInputs(state: StateRecord): StateInput[] {

@@ -190,6 +190,23 @@ Post-validation: exact question coverage, exact rubric factors, evidence keys th
 in the state, choice inside the question's allowed forks. Any failure → run invalid → no
 submission (MISSED on-chain).
 
+### 3.11 Final decision and failures (`final-decision.ts`, `decision.ts`)
+
+`FinalDecision` is the pipeline's output (JEV_INTEGRATION.md §12): `mode` (live/preview),
+`decisionId`, `parameters`, `state`, `questions`, `parallel`, `agentDecisions` (every
+answer), `agents` (ok with final decision, or failed with `AgentFailure`), `aggregation`,
+`aggregateScore`, `aggregateProbability`, `selectedChoice`, `threshold`, `action`,
+`execution` (`not-submitted` with reason, or `submitted` with transactions, on-chain
+status, aggregation check and the next step).
+
+`AgentRun.status` is `ok` or `failed`; `AgentFailure { kind, message, details }` with
+kind ∈ timeout · provider_error · invalid_json · schema_violation · refusal · truncated.
+`AgentRun.inputKeys` lists the state inputs the agent was given.
+
+Aggregate metrics (also on `Aggregation`, reproducible from final submissions):
+`supportShareBps = ⌊support[leading]·10000/total⌋`, `aggregateScore = ⌊Σscore/n⌋` and
+`aggregateProbability = ⌊Σprobability/n⌋` over the backers of the leading choice.
+
 ## 4. Payload store layout (content-addressed)
 
 ```

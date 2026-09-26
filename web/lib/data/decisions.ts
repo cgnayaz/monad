@@ -5,6 +5,7 @@ import { publicClient } from "@/lib/chain/client";
 import { CONTRACT_NAMES, deployment, type ContractName, type Deployment } from "@/lib/chain/deployments";
 import { MONAD_TESTNET, PYTH } from "@/lib/config/public";
 import { AGENTS } from "@/lib/jev/agents";
+import { leadingMetrics } from "@/lib/decmarkt/aggregate";
 import { ACTION_SPACE } from "@/lib/model/action";
 import type { Action } from "@/lib/model/action";
 import type { Aggregation } from "@/lib/model/aggregation";
@@ -175,6 +176,12 @@ export async function getDecisionProvenance(id: bigint): Promise<Availability<De
         guardianDeadline: g.guardianRequired ? Number(g.guardianDeadline) : null,
         approved: pending ? null : executable(forkFromIndex(g.approved)),
         submissions: g.submissions,
+        ...leadingMetrics(
+          forkFromIndex(g.leading),
+          Object.fromEntries(FORKS.map((f, i) => [f, g.support[i]])) as Record<Fork, bigint>,
+          g.totalSupport,
+          submissions.filter((s) => s.questionIndex === 0),
+        ),
       };
     }
 

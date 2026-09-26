@@ -230,7 +230,58 @@ Two distinct verifications:
    published payloads and compares them to chain. Results are shown per item as
    `VERIFIED` / `MISMATCH` / `UNAVAILABLE`.
 
-## 12. What Jev does not do
+## 12. The pipeline (`web/lib/engine/pipeline.ts`)
+
+```
+STATE → QUESTIONS → [COMMIT] → PARALLEL DECISIONS → CHOICE · SCORE · PROBABILITY
+      → [SUBMIT] → AGGREGATION → BOUNDED ACTION → [EXECUTION LAYER] → VERIFY (after horizon)
+```
+
+| Stage | What happens | Code |
+|---|---|---|
+| STATE | collectors read Pyth, Monad RPC, vault and registry; `buildState` hashes the record | `lib/collectors`, `jev/state.ts` |
+| QUESTIONS | templates instantiated for this state; each question gets its own id and the concrete state inputs it evaluates | `jev/questions.ts` |
+| COMMIT (live) | `createDecision(stateHash, questionSetHash)` + `openDecision` — before any agent runs | `chain/execution-layer.ts` |
+| PARALLEL DECISIONS | all five agents start at once; each receives only the state slice its questions use; each run is preserved, including failures | `jev/parallel.ts` |
+| CHOICE / SCORE / PROBABILITY | raw text → JSON → strict schema → semantic checks → `AgentDecision`s; score computed from ratings | `validation/model-output.ts`, `jev/primitives.ts` |
+| SUBMIT (live) | each agent's batch via `submitBatch` from its own operator key | execution layer |
+| AGGREGATION | deterministic integer rules (the contract's formula); never a model | `decmarkt/aggregate.ts` |
+| BOUNDED ACTION | `resolveAction`: engine / fail-safe / guardian, only entries of `ACTION_SPACE` | `jev/action.ts` |
+| EXECUTION LAYER (live) | `aggregate` on-chain → compare with the local result → `execute` only if identical | `engine/pipeline.ts` (`handOff`) |
+| VERIFY | after the horizon, `POST /api/decisions/:id/advance` resolves with a signed price | execution layer `advance` |
+
+**Agent roles.** Risk (downside vs. band, volatility, exposure), Yield (upside, momentum,
+capacity), Security (oracle freshness/confidence, network health, protocol state), Market
+(spot vs. EMA, short-term change, signal vs. noise), Historical (comparable windows, past
+outcomes, sample size). Each answers its primary question and the ACTION question.
+
+**Score.** Documented range 0–10000. The agent produces it through its rubric ratings
+(integers 0–4 per factor); the formula in §4 turns them into the score, which is validated
+by the branded `Score` parser and by the contract (`InvalidScore`).
+
+**Probability.** 100–9900 bps, validated in the strict schema, the `Probability` parser
+and the contract (`InvalidProbability`).
+
+**Reason.** 20–600 characters, informational. It is hashed (`reasonHash`) for audit and
+never read by aggregation, threshold, action or execution.
+
+**Failures.** Every agent failure is classified and kept: `timeout` (per-agent limit,
+default 60 s), `provider_error`, `invalid_json`, `schema_violation` (with each violation),
+`refusal`, `truncated`. A failed agent submits nothing (MISSED on-chain); the others
+continue. With fewer valid decisions than the quorum, the threshold fails and the action
+is NO_ACTION.
+
+**Output.** `FinalDecision` (`web/lib/model/final-decision.ts`): state, questions, every
+agent decision, per-agent outcome (ok / failure), aggregation, aggregate score, aggregate
+probability, selected choice, threshold evaluation, action and the execution handoff.
+Streamed to the browser as NDJSON events by `POST /api/decisions`.
+
+**Modes.** *live* when contracts and all signers are configured; *preview* otherwise (same
+real state and real agents, nothing written on-chain, decisionId `0`); *unavailable*
+without an AI provider. Nothing is simulated in any mode.
+
+## 13. What Jev does not do
+
 
 - It does not hold keys, sign, choose addresses or build calldata.
 - It does not decide the protocol outcome, the threshold result, or settlement.

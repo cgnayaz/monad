@@ -51,6 +51,18 @@ export interface StateRecord {
   hash: Hex;
 }
 
+/**
+ * The part of a committed state an agent receives: only the inputs its questions use.
+ * `stateHash` refers to the full committed state, not to this slice.
+ */
+export interface StateSlice {
+  stateId: StateId;
+  stateHash: Hex;
+  timestamp: UnixSeconds;
+  subject: StateSubject;
+  inputs: StateInput[];
+}
+
 /** What remains of a state when only the on-chain commitment is known. */
 export interface StateRef {
   stateId: StateId | null;

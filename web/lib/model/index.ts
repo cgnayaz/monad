@@ -14,3 +14,4 @@ export * from "./outcome";
 export * from "./accountability";
 export * from "./transaction";
 export * from "./provenance";
+export * from "./final-decision";

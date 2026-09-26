@@ -32,6 +32,10 @@ export interface Question extends QuestionTemplate {
   questionId: QuestionId;
   stateId: StateId;
   createdAt: UnixSeconds;
+  /** State input keys this question evaluates, resolved from `inputKeys` against the state. */
+  inputs: string[];
+  /** How many of those inputs are available ("ok") in the state. */
+  availableInputs: number;
 }
 
 export const QUESTIONS_VERSION = "decmarkt.jev.questions/2" as const;

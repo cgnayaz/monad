@@ -1,7 +1,7 @@
 import { BPS, FORKS, type Fork } from "@/lib/types/protocol";
 import { TIE_BREAK_ORDER } from "@/lib/jev/forks";
 import type { Aggregation, AggregationInput } from "@/lib/model/aggregation";
-import type { AgentId, Choice, DecisionId, Probability, Score } from "@/lib/model/primitives";
+import { toProbability, toScore, type AgentId, type Choice, type DecisionId, type Probability, type Score } from "@/lib/model/primitives";
 
 /**
  * TypeScript mirror of DecisionEngine.aggregate (CONTRACT_SPEC.md §5).
@@ -22,6 +22,26 @@ export interface AggregationConfig {
   thresholdBps: number;
   minActionScore: number;
   quorum: number;
+}
+
+/**
+ * Summary metrics of the leading choice (documented on Aggregation). Computed from the final
+ * submissions only, so they are reproducible from chain data alone.
+ */
+export function leadingMetrics(
+  leading: Fork,
+  support: Record<Fork, bigint>,
+  total: bigint,
+  finals: readonly { choice: Choice; score: Score; probability: Probability }[],
+): Pick<Aggregation, "supportShareBps" | "aggregateScore" | "aggregateProbability"> {
+  const backers = finals.filter((f) => f.choice === leading);
+  if (total === 0n || backers.length === 0) return { supportShareBps: null, aggregateScore: null, aggregateProbability: null };
+  const n = backers.length;
+  return {
+    supportShareBps: Number((support[leading] * BigInt(BPS)) / total),
+    aggregateScore: toScore(Math.floor(backers.reduce((t, b) => t + b.score, 0) / n)),
+    aggregateProbability: toProbability(Math.floor(backers.reduce((t, b) => t + b.probability, 0) / n)),
+  };
 }
 
 export function reputationBps(submitted: number, correct: number): bigint {
@@ -67,5 +87,6 @@ export function aggregate(decisionId: DecisionId, subs: readonly AggregationSubm
     guardianDeadline: null,
     approved,
     submissions: subs.length,
+    ...leadingMetrics(leading, support, total, subs),
   };
 }

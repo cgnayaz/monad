@@ -10,6 +10,7 @@ import {
 } from "@/lib/model/question";
 import type { StateRecord } from "@/lib/model/state";
 import { hashCanonical } from "./canonical";
+import { resolveInputKeys } from "./state";
 
 /**
  * Jev Questions (JEV_INTEGRATION.md §2).
@@ -115,17 +116,26 @@ export function questionIdFor(stateId: string, t: QuestionTemplate): QuestionId 
   return `qn_${hashCanonical({ stateId, index: t.index, category: t.category, text: t.text }).slice(2, 18)}` as QuestionId;
 }
 
-/** Instantiate the question templates for one state. */
+/**
+ * Generate the structured questions for one state: each template is instantiated with its
+ * own id and the concrete state inputs it evaluates (and how many of them are available).
+ */
 export function buildQuestionSet(state: StateRecord, createdAt: UnixSeconds): QuestionSet {
-  const questions: Question[] = QUESTION_TEMPLATES.map((t) => ({
-    ...t,
-    inputKeys: [...t.inputKeys],
-    rubric: t.rubric.map((f) => ({ ...f })),
-    allowedForks: [...t.allowedForks],
-    questionId: questionIdFor(state.stateId, t),
-    stateId: state.stateId,
-    createdAt,
-  }));
+  const questions: Question[] = QUESTION_TEMPLATES.map((t) => {
+    const inputs = resolveInputKeys(state, t.inputKeys);
+    const ok = new Set(state.data.inputs.filter((i) => i.status === "ok").map((i) => i.key));
+    return {
+      ...t,
+      inputKeys: [...t.inputKeys],
+      rubric: t.rubric.map((f) => ({ ...f })),
+      allowedForks: [...t.allowedForks],
+      questionId: questionIdFor(state.stateId, t),
+      stateId: state.stateId,
+      createdAt,
+      inputs,
+      availableInputs: inputs.filter((k) => ok.has(k)).length,
+    };
+  });
   const byIndex = (i: number) => questions.find((q) => q.index === i)!.questionId;
   const assignment = Object.fromEntries(
     Object.entries(DEFAULT_ASSIGNMENT).map(([agent, idx]) => [agent, idx.map(byIndex)]),
@@ -154,4 +164,9 @@ export function questionByIndex(set: QuestionSet, index: number): Question {
 
 export function assignedQuestions(set: QuestionSet, agent: AgentKey): Question[] {
   return set.assignment[agent].map((id) => questionById(set, id));
+}
+
+/** The state input keys an agent needs: the union of its questions' inputs. */
+export function relevantInputKeys(questions: readonly Question[]): string[] {
+  return [...new Set(questions.flatMap((q) => q.inputs))].sort();
 }

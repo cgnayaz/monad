@@ -35,4 +35,14 @@ export interface Aggregation {
   /** null while a guardian decision is pending. */
   approved: Exclude<Fork, "ESCALATE"> | null;
   submissions: number;
+  /**
+   * Summary metrics of the leading choice, derived from the final submissions (null when
+   * nothing was submitted):
+   *   supportShareBps      = ⌊support[leading] × 10000 / total⌋   (compared with thresholdBps)
+   *   aggregateScore       = ⌊Σ score / n⌋ over backers of leading  (the minActionScore gate value)
+   *   aggregateProbability = ⌊Σ probability / n⌋ over backers of leading
+   */
+  supportShareBps: number | null;
+  aggregateScore: Score | null;
+  aggregateProbability: Probability | null;
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { FORKS, PROBABILITY_MAX, PROBABILITY_MIN } from "@/lib/types/protocol";
 import type { Question } from "@/lib/model/question";
-import type { StateRecord } from "@/lib/model/state";
+import type { StateSlice } from "@/lib/model/state";
 
 /**
  * The only shape accepted from an AI model (DATA_MODEL.md §3).
@@ -59,16 +59,16 @@ export type Validation =
 /**
  * Schema validation plus semantic checks against the committed state and the agent's
  * assigned questions: exact question coverage, exact rubric factors, evidence keys that
- * exist in the state, and choices inside each question's allowed forks.
+ * the agent was actually given, and choices inside each question's allowed forks.
  */
-export function validateModelOutput(raw: unknown, ctx: { state: StateRecord; assigned: Question[] }): Validation {
+export function validateModelOutput(raw: unknown, ctx: { state: StateSlice; assigned: Question[] }): Validation {
   const parsed = StrictOutput.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, errors: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) };
   }
   const errors: string[] = [];
   const answers = parsed.data.answers;
-  const stateKeys = new Set(ctx.state.data.inputs.map((i) => i.key));
+  const stateKeys = new Set(ctx.state.inputs.map((i) => i.key)); // only what this agent was shown
 
   const got = answers.map((a) => a.questionIndex).sort();
   const want = ctx.assigned.map((q) => q.index).sort();

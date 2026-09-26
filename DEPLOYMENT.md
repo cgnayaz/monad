@@ -64,7 +64,15 @@ vercel link && vercel env pull   # once
 vercel --prod
 ```
 
-## 5. Release checklist
+## 5. End-to-end test on a local chain
+
+`web/scripts/integration.sh` starts anvil (chain id 10143), deploys the contracts with the
+real deploy script, places Pyth's official MockPyth at the Pyth address and runs the real
+TypeScript execution layer through a full round (commit → 5 × submitBatch → aggregate →
+execute → resolve), then checks the provenance read layer. Only the AI provider is scripted.
+The deployments file is restored afterwards. Uses anvil's public development keys.
+
+## 6. Release checklist
 
 - [ ] `forge test` green, invariants fuzzed.
 - [ ] `guvenlik-denetcisi` review; findings fixed or documented in SECURITY_MODEL.md.
