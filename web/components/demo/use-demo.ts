@@ -61,8 +61,11 @@ export interface VerifyResult {
   endTime: number | null;
   moveBps: string;
   bandBps: number;
-  source: "chain" | "pyth-offchain";
+  source: "chain" | "pyth-offchain" | "example";
 }
+
+/** Illustrative price paths for explaining verification when no real price is available. */
+export type ExampleMove = "down" | "flat" | "up";
 
 type WEvent = Wire<PipelineEvent>;
 
@@ -77,6 +80,20 @@ async function json<T>(res: Response): Promise<T> {
   return body;
 }
 
+/** Settlement with OutcomeRegistry's formula on notional bonds; nothing is locked or transferred. */
+function notionalSettlement(d: NonNullable<RoundProgress["decision"]>, observed: Exclude<Fork, "ESCALATE">): Settlement {
+  const bond = BigInt(d.parameters.lockPerAgent);
+  const participants = AGENTS.map((a) => {
+    const out = d.agents.find((x) => x.agentId === a.agentId);
+    return {
+      agentId: a.agentId,
+      bond,
+      submission: out && out.status === "ok" ? { choice: out.final.choice, probability: toProbability(out.final.probability) } : null,
+    };
+  });
+  return settle("0", participants, observed, { slashBps: DEFAULT_PARAMS.slashBps, missPenaltyBps: DEFAULT_PARAMS.missPenaltyBps, roundReward: DEFAULT_PARAMS.roundReward });
+}
+
 export function useDemo() {
   const [mode, setMode] = useState<DemoMode>("simulation");
   const [steps, setSteps] = useState(initialSteps);
@@ -86,6 +103,8 @@ export function useDemo() {
   const [simExecution, setSimExecution] = useState<{ fork: Fork; start: PriceObs } | null>(null);
   const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [simSettlement, setSimSettlement] = useState<Settlement | null>(null);
+  /** Why no real price could be read (simulation only); enables the labelled example scenario. */
+  const [priceMissing, setPriceMissing] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<{ label: string; until: number; total: number } | null>(null);
   const [running, setRunning] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -182,7 +201,14 @@ export function useDemo() {
           set("ACTION", { status: "done", note: `yerel kasa modeline ${start.publishTime} yayın zamanında uygulandı` });
           set("MONAD", { status: "skipped", note: "simülasyon modu işlem göndermez" });
         } catch (err) {
-          return fail("ACTION", `Başlangıç fiyatı alınamadı: ${(err as Error).message}`);
+          // No real price: the decision itself is complete and real; verification cannot run.
+          // Stop cleanly and offer the clearly labelled example scenario instead of failing.
+          setPriceMissing((err as Error).message);
+          set("ACTION", { status: "done", note: "karar onaylandı; gerçek fiyat olmadığı için kasa modeline uygulanmadı" });
+          set("MONAD", { status: "skipped", note: "simülasyon modu işlem göndermez" });
+          set("VERIFY", { status: "active", note: "gerçek fiyat verisi yok" });
+          setRunning(false);
+          return;
         }
       }
       if (!exec) return;
@@ -218,21 +244,44 @@ export function useDemo() {
       setVerify(result);
       set("VERIFY", { status: "done" });
 
-      // SETTLEMENT with the contract's formula on notional bonds.
-      const bond = BigInt(d.parameters.lockPerAgent);
-      const participants = AGENTS.map((a) => {
-        const out = d.agents.find((x) => x.agentId === a.agentId);
-        return {
-          agentId: a.agentId,
-          bond,
-          submission: out && out.status === "ok" ? { choice: out.final.choice, probability: toProbability(out.final.probability) } : null,
-        };
-      });
-      setSimSettlement(settle("0", participants, observed, { slashBps: DEFAULT_PARAMS.slashBps, missPenaltyBps: DEFAULT_PARAMS.missPenaltyBps, roundReward: DEFAULT_PARAMS.roundReward }));
+      setSimSettlement(notionalSettlement(d, observed));
       set("SETTLEMENT", { status: "done", note: "itibari teminatlar; hiçbir şey transfer edilmez" });
       setRunning(false);
     },
     [fail, set],
+  );
+
+  /**
+   * Explain verification and settlement with an illustrative price move when no real price
+   * exists. Everything produced here is marked source "example" and labelled in the UI; the
+   * agents' decisions it is applied to are the real ones from this round.
+   */
+  const runExample = useCallback(
+    (move: ExampleMove) => {
+      const d = progress.decision;
+      if (!d?.action) return;
+      const expo = -8;
+      const start = 300_000_000_000n; // 3,000.00 USD, illustrative
+      const deltaBps = move === "down" ? -50n : move === "up" ? 50n : 2n;
+      const end = start + (start * deltaBps) / 10_000n;
+      const observed = correctFork(start, end, d.parameters.bandBps);
+      setVerify({
+        expected: d.action.fork,
+        observed,
+        success: observed === d.action.fork,
+        startPrice: formatPrice(start, expo),
+        endPrice: formatPrice(end, expo),
+        startTime: null,
+        endTime: null,
+        moveBps: moveBps(start, end).toString(),
+        bandBps: d.parameters.bandBps,
+        source: "example",
+      });
+      set("VERIFY", { status: "done", note: "örnek senaryo — gerçek fiyat değil" });
+      setSimSettlement(notionalSettlement(d, observed));
+      set("SETTLEMENT", { status: "done", note: "örnek senaryo; itibari teminatlar" });
+    },
+    [progress.decision, set],
   );
 
   // ─── Step 8–11, live ─────────────────────────────────────────────────────
@@ -346,6 +395,7 @@ export function useDemo() {
     setSimExecution(null);
     setVerify(null);
     setSimSettlement(null);
+    setPriceMissing(null);
     setCountdown(null);
     setRunning(true);
     setStartedAt(Date.now());
@@ -448,8 +498,8 @@ export function useDemo() {
 
   // Remember a finished round for the dashboard (this browser only).
   useEffect(() => {
-    if (steps.SETTLEMENT.status === "done") saveLastRound(chainView ?? roundView);
-  }, [steps.SETTLEMENT.status, chainView, roundView]);
+    if (steps.SETTLEMENT.status === "done" && verify?.source !== "example") saveLastRound(chainView ?? roundView);
+  }, [steps.SETTLEMENT.status, chainView, roundView, verify?.source]);
 
   const awaitingExecution = mode === "live" && !!decisionId && steps.MONAD.status === "active" && !running && steps.ACTION.status === "active";
 
@@ -464,6 +514,8 @@ export function useDemo() {
     simExecution,
     verify,
     simSettlement,
+    priceMissing,
+    runExample,
     countdown,
     running,
     startedAt,

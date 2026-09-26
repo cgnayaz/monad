@@ -11,6 +11,7 @@ import {
   AggregationStep,
   BatchStep,
   Countdown,
+  ExampleChooser,
   ForksStep,
   MonadStep,
   ParallelStep,
@@ -69,10 +70,13 @@ export function Demo({ modes, idle, allowedForks }: { modes: Record<DemoMode, Mo
     VERIFY: (
       <div className="space-y-3">
         {d.countdown && <Countdown {...d.countdown} />}
+        {d.priceMissing && d.mode === "simulation" && (
+          <ExampleChooser reason={d.priceMissing} action={v.action?.fork ?? null} onPick={d.runExample} />
+        )}
         <VerifyStep r={d.verify} mode={d.mode} />
       </div>
     ),
-    SETTLEMENT: <SettlementStep mode={d.mode} v={v} sim={d.simSettlement} />,
+    SETTLEMENT: <SettlementStep mode={d.mode} v={v} sim={d.simSettlement} example={d.verify?.source === "example"} />,
   };
 
   // Before a round starts, the current snapshot and the action space are already real and shown.
@@ -206,7 +210,7 @@ export function Demo({ modes, idle, allowedForks }: { modes: Record<DemoMode, Mo
               <Row k="Seçilen" v={v.aggregation?.leading ?? "—"} />
               <Row k="Eşik" v={v.aggregation ? `${v.aggregation.supportShareBps != null ? formatBps(v.aggregation.supportShareBps, 1) : "—"} · ${v.aggregation.passed ? "geçti" : "sağlanmadı"}` : "—"} />
               <Row k="Eylem" v={v.action?.fork ?? "—"} />
-              <Row k="Sonuç" v={d.verify ? `${d.verify.observed} · ${d.verify.success ? "başarılı" : "isabetsiz"}` : "—"} />
+              <Row k="Sonuç" v={d.verify ? `${d.verify.observed} · ${d.verify.success ? "başarılı" : "isabetsiz"}${d.verify.source === "example" ? " (örnek)" : ""}` : "—"} />
             </dl>
           </div>
           {d.decision?.mode === "live" && (
