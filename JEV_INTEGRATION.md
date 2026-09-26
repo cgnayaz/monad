@@ -181,10 +181,10 @@ One round is a batch of related decisions. Every answer is a full Jev decision w
 provenance:
 
 ```
-leaf = keccak256(abi.encode(
+leaf = keccak256(bytes.concat(keccak256(abi.encode(
   decisionId, agentId, questionId, choice, score, probability, reasonHash
-))
-answersRoot = MerkleRoot(leaves of this agent)      // OpenZeppelin StandardMerkleTree
+))))                                                 // uint256,uint16,uint8,uint8,uint16,uint16,bytes32
+answersRoot = MerkleRoot(leaves of this agent)      // OpenZeppelin StandardMerkleTree (double-hashed leaves)
 ```
 
 Default assignment: each agent answers its primary question and question 0 (ACTION).

@@ -11,9 +11,10 @@ Mükemmel kod değil, **çalışan ve etkileyici demo** önemli. Her 1-2 saatte 
 
 ## Teknoloji
 - **Kontrat:** Solidity + Foundry (`contracts/`)
-- **Frontend:** Next.js (App Router) + TypeScript + Tailwind + wagmi + viem + RainbowKit (`web/`)
+- **Frontend:** Next.js (App Router) + TypeScript + Tailwind + wagmi + viem (`web/`, cüzdan için injected connector; RainbowKit yok)
 - **AI:** sunucu tarafı provider soyutlaması (`web/lib/ai/`), 5 bağımsız analist; round adımları `web/app/api/rounds/`
-- **Oracle:** Pyth (Monad testnet `0x2880aB155794e7179c9eE2e38200202908C17B43`, MON/USD)
+- **Kalite:** `cd web && npm run check` (typegen+tsc, eslint, vitest, build) — commit öncesi yeşil olmalı
+- **Oracle:** Pyth (Hermes API anahtarı gerekli: `PYTH_API_KEY`) (Monad testnet `0x2880aB155794e7179c9eE2e38200202908C17B43`, MON/USD)
 - Agent kodu yazarken önce `claude-api` skill'ini yükle; model adlarını ezberden yazma.
 
 ## Monad bilgileri (etkinlikte doğrula!)

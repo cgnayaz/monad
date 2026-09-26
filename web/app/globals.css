@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+/* DESIGN_SYSTEM.md §3 — paper and ink, one accent, semantic colours for state only. */
+:root {
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --surface-2: #efede7;
+  --ink: #16171a;
+  --ink-2: #55575c;
+  --ink-3: #8a8b8f;
+  --rule: #dedbd3;
+  --accent: #b4501e;
+  --pass: #1f6b45;
+  --fail: #a8321e;
+  --wait: #8a6a12;
+  --fork-0: #c9c6bd;
+  --fork-1: #8f8c84;
+  --fork-2: #55575c;
+  --fork-3: #16171a;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1011;
+    --surface: #16171a;
+    --surface-2: #1d1f22;
+    --ink: #eceae4;
+    --ink-2: #a2a39f;
+    --ink-3: #6e6f72;
+    --rule: #2a2c30;
+    --accent: #e07a45;
+    --pass: #4fb283;
+    --fail: #e2705c;
+    --wait: #d2ae4a;
+    --fork-0: #3a3c40;
+    --fork-1: #5d5f63;
+    --fork-2: #8f908c;
+    --fork-3: #eceae4;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1011;
+  --surface: #16171a;
+  --surface-2: #1d1f22;
+  --ink: #eceae4;
+  --ink-2: #a2a39f;
+  --ink-3: #6e6f72;
+  --rule: #2a2c30;
+  --accent: #e07a45;
+  --pass: #4fb283;
+  --fail: #e2705c;
+  --wait: #d2ae4a;
+  --fork-0: #3a3c40;
+  --fork-1: #5d5f63;
+  --fork-2: #8f908c;
+  --fork-3: #eceae4;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-pass: var(--pass);
+  --color-fail: var(--fail);
+  --color-wait: var(--wait);
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --radius-xs: 2px;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 22px;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+/* Rendered documentation (/docs). */
+.prose-doc {
+  max-width: 76ch;
+}
+.prose-doc h1 { font-size: 32px; line-height: 40px; font-weight: 500; letter-spacing: -0.01em; margin: 0 0 24px; }
+.prose-doc h2 { font-size: 20px; line-height: 28px; font-weight: 500; margin: 40px 0 12px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.prose-doc h3 { font-size: 15px; line-height: 22px; font-weight: 600; margin: 24px 0 8px; }
+.prose-doc p, .prose-doc ul, .prose-doc ol, .prose-doc blockquote { margin: 0 0 12px; }
+.prose-doc ul { list-style: disc; padding-left: 20px; }
+.prose-doc ol { list-style: decimal; padding-left: 20px; }
+.prose-doc a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.prose-doc blockquote { border-left: 2px solid var(--rule); padding-left: 12px; color: var(--ink-2); }
+.prose-doc code { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); padding: 1px 4px; border-radius: 2px; }
+.prose-doc pre { font-family: var(--font-mono); font-size: 12.5px; line-height: 19px; background: var(--surface-2); border: 1px solid var(--rule); padding: 12px 14px; overflow-x: auto; margin: 0 0 16px; }
+.prose-doc pre code { background: none; padding: 0; }
+.prose-doc table { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: 13px; display: block; overflow-x: auto; }
+.prose-doc th { text-align: left; font-weight: 500; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); background: var(--surface-2); }
+.prose-doc th, .prose-doc td { border: 1px solid var(--rule); padding: 6px 10px; vertical-align: top; }
+.prose-doc hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

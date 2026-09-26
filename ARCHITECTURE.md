@@ -158,6 +158,7 @@ calldata, or functions.
 | Monad Testnet chain id | `10143` (`0x279f`) | `eth_chainId` on `https://testnet-rpc.monad.xyz` |
 | Pyth contract on Monad Testnet | `0x2880aB155794e7179c9eE2e38200202908C17B43`, `version() = 1.4.6`, `getValidTimePeriod() = 60` | `cast call` |
 | Pyth MON/USD feed id | `0x31491744e2dbf6df7fcf4ac0820d18a609b49076d45066d3568424e62f686cd1` | Hermes `/v2/price_feeds?query=MON` |
+| Hermes price updates require an API key | since 2026-08-26 (Pyth Core upgrade); endpoint `https://pyth.dourolabs.app/hermes`, `Authorization: Bearer` | unauthenticated request → 401; Pyth upgrade docs |
 
 Anything not in this table (explorer verification method, faucet limits, RPC log-range
 limits) is marked *to verify* in [DEPLOYMENT.md](DEPLOYMENT.md).

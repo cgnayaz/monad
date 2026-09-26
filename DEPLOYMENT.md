@@ -8,7 +8,8 @@
 | RPC | `https://testnet-rpc.monad.xyz` | verified |
 | Pyth | `0x2880aB155794e7179c9eE2e38200202908C17B43` (v1.4.6) | verified |
 | MON/USD feed | `0x31491744e2dbf6df7fcf4ac0820d18a609b49076d45066d3568424e62f686cd1` | verified via Hermes |
-| Hermes | `https://hermes.pyth.network` | verified reachable |
+| Hermes | `https://pyth.dourolabs.app/hermes` + `PYTH_API_KEY` (Bearer) | key required since 2026-08-26; old host returns 401 for price updates |
+| Pyth testnet contract accepts post-upgrade update format | — | to verify with a fork test before contract deploy |
 | Explorer | `https://testnet.monadexplorer.com` | to verify |
 | Source verification | Sourcify / explorer API | to verify |
 | Faucet | `https://faucet.monad.xyz` | to verify limits |
@@ -49,9 +50,9 @@ reward pool, run one smoke round.
 ## 4. Web (Vercel)
 
 - Root directory: `web/`. Framework: Next.js. Node 24.
-- Server env (never `NEXT_PUBLIC_`): `ANTHROPIC_API_KEY`, `AI_MODEL`, `PROPOSER_PRIVATE_KEY`,
+- Server env (never `NEXT_PUBLIC_`): `ANTHROPIC_API_KEY`, `AI_MODEL`, `PYTH_API_KEY`, `PYTH_HERMES_URL`, `PROPOSER_PRIVATE_KEY`,
   `AGENT_*_PRIVATE_KEY`, `KEEPER_PRIVATE_KEY`, `BLOB_READ_WRITE_TOKEN`, `DEMO_RATE_LIMIT`.
-- Public env: `NEXT_PUBLIC_CHAIN_ID=10143`, `NEXT_PUBLIC_RPC_URL`, contract addresses come
+- Public env: `NEXT_PUBLIC_MONAD_RPC_URL` (optional), contract addresses come
   from the committed deployments JSON.
 - Round endpoints set `maxDuration` within the plan's limit; each call does one lifecycle
   step, so no single invocation waits for all stages.

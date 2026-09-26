@@ -1,0 +1,10 @@
+{
+  "chainId": 10143,
+  "deployBlock": null,
+  "contracts": {
+    "DecisionRegistry": null,
+    "DecisionEngine": null,
+    "ExecutionVault": null,
+    "OutcomeRegistry": null
+  }
+}
