@@ -48,7 +48,7 @@ All keys are **testnet-only** and hold small balances.
 1. **Server relays model output faithfully.** The five operator keys are held by the
    DecMarkt server, so the system cannot cryptographically prove the submitted choice
    equals the model's raw output. We publish the raw output hash, full answers, model id
-   and latency per run, and bind them with `reasonHash`/`answersRoot`. For untrusted,
+   and latency per run, and bind each on-chain answer to its text with `reasonHash`. For untrusted,
    independently operated agents, each agent runs its own operator key — the contract
    already supports this without change.
 2. **Proposer selects the state honestly.** Tamper-evident, not selection-proof.

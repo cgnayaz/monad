@@ -1,7 +1,8 @@
 # Contract Specification
 
-Solidity `^0.8.24`, Foundry, OpenZeppelin v5 (`AccessControl`, `Pausable`,
-`ReentrancyGuard`, `MerkleProof`), Pyth SDK (`IPyth`, `PythStructs`).
+Solidity `0.8.28` (via-IR), Foundry, OpenZeppelin v5.4 (`AccessControl`, `Pausable`,
+`ReentrancyGuard`), Pyth SDK v2.2 (`IPyth`, `PythStructs`, `MockPyth` in tests).
+Source: `contracts/src/`. Tests: `contracts/test/` (65 tests incl. a 512-run fuzz).
 Types and errors are shared via `src/lib/DecTypes.sol` (see DATA_MODEL.md §2).
 
 ## 1. Contracts and responsibilities
@@ -14,7 +15,7 @@ Types and errors are shared via `src/lib/DecTypes.sol` (see DATA_MODEL.md §2).
 | `OutcomeRegistry` | outcome verification (Pyth), correct fork, settlement computation | hold bonds |
 
 Status writes are exclusive: only the contract responsible for a transition can make it
-(enforced by roles on `DecisionRegistry._setStatus`).
+(each transition is its own role-gated function on `DecisionRegistry`).
 
 ## 2. Roles
 
@@ -25,8 +26,8 @@ Status writes are exclusive: only the contract responsible for a transition can 
 | `GUARDIAN_ROLE` | human wallet | resolve ESCALATE |
 | `ENGINE_ROLE` | `DecisionEngine` | set AGGREGATED / APPROVED / CANCELLED(quorum) |
 | `VAULT_ROLE` | `ExecutionVault` | set EXECUTED |
-| `OUTCOME_ROLE` | `OutcomeRegistry` | set RESOLVED, apply settlement |
-| agent operator | one address per agent | `submit` for its own agentId |
+| `OUTCOME_ROLE` | `OutcomeRegistry` | apply settlement and set RESOLVED (`settleAndResolve`) |
+| agent operator | one address per agent | `submit` / `submitBatch` for its own agentId; `withdrawBond` |
 
 Agent operators are identified by `msg.sender`. `tx.origin` is never used.
 
@@ -65,183 +66,237 @@ transaction; both transitions are recorded with the same block number.
 
 ## 4. DecisionRegistry
 
+Stores, per decision: `id`, `stateHash`, `questionSetHash`, `proposer`, `status`, `config`
+(including `thresholdBps` and `questionCount`), `createdAt`, `openedAt`, `deadline`,
+`participants`, `roundReward`, `statusBlock[8]`.
+
 ```solidity
-// agents
-function registerAgent(address operator, bytes32 nameHash, string calldata uri) external onlyRole(ADMIN) returns (uint16);
-function setAgentActive(uint16 agentId, bool active) external onlyRole(ADMIN);
-function depositBond(uint16 agentId) external payable;                       // anyone may fund
-function withdrawBond(uint16 agentId, uint256 amount) external nonReentrant; // operator only, free bond only
-function fundRewardPool() external payable;
+// agents, bonds, rewards
+function registerAgent(address operator, bytes32 nameHash, string calldata uri) external returns (uint16); // ADMIN
+function setAgentActive(uint16 agentId, bool active) external;                                            // ADMIN
+function depositBond(uint16 agentId) external payable;                     // anyone
+function withdrawBond(uint16 agentId, uint256 amount) external;            // operator, free bond only, nonReentrant, CEI
+function fundRewardPool() external payable;                                // anyone
+function setRoundReward(uint256 amount) external;                          // ADMIN
 
 // decisions
-function createDecision(bytes32 stateHash, bytes32 questionsHash, DecisionConfig calldata cfg) external onlyRole(PROPOSER) returns (uint256 id);
-function openDecision(uint256 id) external onlyRole(PROPOSER);   // snapshots participants, locks bonds, reserves roundReward
-function submit(uint256 id, uint16 agentId, Fork choice, uint16 score, uint16 probability, bytes32 reasonHash, bytes32 answersRoot) external;
-function cancel(uint256 id) external;
+function createDecision(bytes32 stateHash, bytes32 questionSetHash, DecisionConfig calldata cfg) external returns (uint256); // PROPOSER
+function openDecision(uint256 id) external;                                // PROPOSER: snapshot participants, lock bonds, reserve reward
+function submit(uint256 id, uint16 agentId, Answer calldata answer) external;          // operator
+function submitBatch(uint256 id, uint16 agentId, Answer[] calldata answers) external;  // operator: a Jev batch in one tx
+function cancel(uint256 id) external;                                      // PROPOSER or ADMIN, CREATED/OPEN only
 
-// restricted
-function setStatus(uint256 id, Status s) external;               // ENGINE/VAULT/OUTCOME, transition-checked
-function applySettlement(uint256 id, SettlementLine[] calldata lines, uint256 toRewardPool) external onlyRole(OUTCOME);
+// restricted transitions (one function per transition)
+function markAggregated(uint256 id) external;        // ENGINE   OPEN → AGGREGATED
+function markApproved(uint256 id) external;          // ENGINE   AGGREGATED → APPROVED
+function markCancelledNoQuorum(uint256 id) external; // ENGINE   OPEN → CANCELLED
+function markExecuted(uint256 id) external;          // VAULT    APPROVED → EXECUTED
+function settleAndResolve(uint256 id, SettlementLine[] calldata lines, uint256 toRewardPool) external; // OUTCOME EXECUTED → RESOLVED
 
 // views
 function getDecision(uint256 id) external view returns (Decision memory);
-function getSubmission(uint256 id, uint16 agentId) external view returns (Submission memory);
+function getSubmission(uint256 id, uint16 agentId, uint8 questionId) external view returns (Submission memory);
+function getFinalSubmission(uint256 id, uint16 agentId) external view returns (bool, Submission memory);
 function getAgent(uint16 agentId) external view returns (Agent memory);
-function decisionCount() external view returns (uint256);
-function verifyAnswer(uint256 id, uint16 agentId, bytes32[] calldata proof, bytes32 leaf) external view returns (bool);
+function decisionCount() / agentCount() / rewardPool() / reservedRewards() / roundReward()
+function answerCount(uint256 id, uint16 agentId) / finalSubmissionCount(uint256 id)
 ```
 
-`submit` checks, in order: status == OPEN · `block.timestamp <= deadline` ·
-`msg.sender == agents[agentId].operator` · agent is a participant · not already submitted
-· choice allowed by mask · `score <= 10000` · `100 <= probability <= 9900` · non-zero hashes.
+**Submissions.** `Answer { questionId, choice, score, probability, reasonHash }`. Each
+stored `Submission` records `agentId, questionId, choice, score, probability, reasonHash,
+bond, submittedAt`. Every question an agent answers is its own on-chain record, so
+question-level provenance is on-chain; the answer to question 0 (ACTION) is the agent's
+final decision and the only one aggregated.
+
+Checks, in order: status == OPEN · `block.timestamp <= deadline` (else `DeadlinePassed`) ·
+`msg.sender == operator` (`NotAgentOperator`) · participant (`NotParticipant`) ·
+`questionId < questionCount` (`InvalidQuestion`) · not yet answered (`AlreadySubmitted`) ·
+`choice < 4` (`InvalidChoice`, checked on the raw uint8 before any enum cast) · choice in
+`allowedForks` (`ChoiceNotAllowed`) · `score <= 10000` (`InvalidScore`) ·
+`100 <= probability <= 9900` (`InvalidProbability`) · `reasonHash != 0` (`InvalidHash`).
+
+**Config validation** at creation: window 1 s–1 h, horizon 1 s–7 d, band ≤ 1000,
+threshold 5001–10000, minActionScore ≤ 10000, quorum 3–16, `allowedForks` ⊆ 0x0F and
+includes NO_ACTION, questionCount 1–16, lockPerAgent > 0. Duplicate `stateHash` → `DuplicateState`.
+
+**Settlement application** verifies coverage (one line per participant, in order), each
+line releases exactly the lock, penalty ≤ lock, and conservation:
+`roundReward + Σ penalty == toRewardPool + Σ reward`. Otherwise `InvalidSettlement`.
 
 ## 5. DecisionEngine
 
 ```solidity
-function aggregate(uint256 id) external whenNotPaused;
-function guardianDecide(uint256 id, Fork fork) external onlyRole(GUARDIAN);
-function finalizeEscalation(uint256 id) external;
+function aggregate(uint256 id) external;                  // anyone
+function guardianDecide(uint256 id, uint8 choice) external; // GUARDIAN
+function finalizeEscalation(uint256 id) external;         // anyone, after the guardian window
 function getAggregation(uint256 id) external view returns (Aggregation memory);
+function approvedAction(uint256 id) external view returns (Choice); // reverts unless APPROVED or later
 ```
 
-### Aggregation (pure integer math, reproduced in `web/lib/decmarkt/aggregate.ts` for preview only)
+### Aggregation formula (exact; integer arithmetic, truncating division)
+
+Jev provides Choice, Score and Probability; DecMarkt determines aggregate, threshold and
+approved action. Reputation is read from the agents' on-chain records at the aggregation
+block; every input is emitted (`AgentWeighted`) so the result is reproducible off-chain
+(`web/lib/decmarkt/aggregate.ts` implements the same formula).
 
 ```
-for each participant i that submitted:
-    rep_i   = (correct_i + 1) × 10000 / (submitted_i + 2)        // Laplace-smoothed accuracy, 0..10000
+aggregate allowed when: status == OPEN ∧ (now > deadline ∨ finalSubmissions == |participants|)
+if finalSubmissions < quorum → CANCELLED (locks and reserved reward returned)
+
+for each participant i with a final (question 0) submission:
+    rep_i   = (correct_i + 1) × 10000 / (submitted_i + 2)
     w_i     = probability_i × rep_i / 10000
     support[choice_i] += w_i
 total   = Σ support
-leading = argmax(support); ties → safest by order NO_ACTION > ESCALATE > DERISK > DEPLOY
+leading = first of [NO_ACTION, ESCALATE, ACTION_A, ACTION_B] with strictly the highest support
+share   = total > 0 ∧ support[leading] × 10000 ≥ thresholdBps × total
+score   = leading ∈ {ACTION_A, ACTION_B} ⇒ (Σ score of backers) / (number of backers) ≥ minActionScore
+passed  = share ∧ score                                   (quorum already met)
 
-passed  = submissions ≥ quorum
-          ∧ support[leading] × 10000 ≥ thresholdBps × total
-          ∧ (leading ∈ {DERISK, DEPLOY} ⇒ avgScore(submitters choosing leading) ≥ minActionScore)
-
-if !passed                → approved = NO_ACTION            (fail-safe, still executed & settled)
-elif leading == ESCALATE  → guardianRequired, guardianDeadline = now + GUARDIAN_WINDOW
-else                      → approved = leading
+!passed              → approved = NO_ACTION (fail-safe), APPROVED in the same tx
+leading == ESCALATE  → AGGREGATED; GUARDIAN picks NO_ACTION/ACTION_A/ACTION_B within 120 s,
+                       otherwise finalizeEscalation → NO_ACTION
+otherwise            → approved = leading, APPROVED in the same tx
 ```
 
 ## 6. ExecutionVault
 
 ```solidity
-function deposit() external payable;                              // treasury funding → RESERVE
-function execute(uint256 id, bytes[] calldata pythUpdate) external payable nonReentrant whenNotPaused;
+function deposit() external payable;          // → RESERVE
+function depositActive() external payable;    // → ACTIVE (initial allocation)
+function execute(uint256 id, bytes[] calldata pythUpdate) external payable; // anyone; msg.value == Pyth fee
+function setActionParams(uint16 actionBps, uint256 maxMove, uint64 cooldown) external; // ADMIN, actionBps ≤ 2500
+function emergencyWithdraw(address payable to, uint256 amount) external;              // ADMIN, only while paused
 function balances() external view returns (uint256 active, uint256 reserve);
 function getExecution(uint256 id) external view returns (Execution memory);
-function setActionParams(uint16 actionBps, uint256 maxMove, uint64 cooldown) external onlyRole(ADMIN); // hard caps: actionBps ≤ 2500
+receive() external payable;                   // always reverts (no untracked funds)
 ```
 
-`execute`:
-1. require registry status == APPROVED; read `approved` from engine (caller cannot choose it).
-2. `pyth.parsePriceFeedUpdates{value: fee}(update, [MON_USD], now − 60, now)` → start price.
-3. apply exactly one branch:
-   - `NO_ACTION` → no movement
-   - `DERISK` → `amt = min(active × actionBps / 1e4, maxMove)`; active −= amt; reserve += amt
-   - `DEPLOY` → `amt = min(reserve × actionBps / 1e4, maxMove)`; reserve −= amt; active += amt
-4. store `Execution`, set EXECUTED, refund excess `msg.value`.
+`execute`: status == APPROVED · cooldown elapsed · `msg.value == pyth.getUpdateFee(update)`
+(exact, so no refund transfer is needed) · action read from `engine.approvedAction(id)` ·
+start price from `pyth.parsePriceFeedUpdates(update, [MON/USD], now − 60, now)`, price > 0 ·
+then exactly one branch:
 
-There is no `call`, `delegatecall`, or user-supplied target anywhere in the vault. The
-only value transfers are Pyth fee payment (to the fixed Pyth address) and refund to
-`msg.sender`. Admin withdrawal of treasury exists only while paused and emits an event.
+| Choice | Effect |
+|---|---|
+| NO_ACTION | nothing moves |
+| ACTION_A | `amt = min(active × actionBps / 10000, maxMove)`; ACTIVE → RESERVE |
+| ACTION_B | `amt = min(reserve × actionBps / 10000, maxMove)`; RESERVE → ACTIVE |
+
+Funds never leave the vault through `execute`. There is no target, calldata or amount
+parameter anywhere; the only value transfers in the contract are the Pyth fee (to the
+immutable Pyth address) and the paused-only admin emergency withdrawal.
 
 ## 7. OutcomeRegistry
 
 ```solidity
-function resolve(uint256 id, bytes[] calldata pythUpdate) external payable nonReentrant;
+function resolve(uint256 id, bytes[] calldata pythUpdate) external payable; // anyone; msg.value == fee
+function voidOutcome(uint256 id) external;                                  // anyone, after the grace period
 function getOutcome(uint256 id) external view returns (Outcome memory);
 function getSettlement(uint256 id, uint16 agentId) external view returns (SettlementLine memory);
-function previewSettlement(uint256 id, Fork correctFork) external view returns (SettlementLine[] memory);
+function previewSettlement(uint256 id, Choice observed) external view returns (SettlementLine[] memory, uint256);
+function observedChoice(int256 outcomeValue, uint16 bandBps) external pure returns (Choice);
+function setPenaltyParams(uint16 slashBps, uint16 missPenaltyBps) external;  // ADMIN, ≤ 5000 / ≤ 2000
 ```
 
-`resolve`:
-1. status == EXECUTED; `t0 = executedAt + horizon`; `block.timestamp >= t0`.
-2. `parsePriceFeedUpdates(update, [MON_USD], t0, t0 + RESOLUTION_TOLERANCE)` — the price
-   must have been published inside the window; signature verified by Pyth.
-3. `moveBps = (end − start) × 10000 / start` (same expo enforced).
-4. `correctFork` per JEV_INTEGRATION.md §11.
-5. compute settlement (§10) → `registry.applySettlement` → status RESOLVED.
+Records per decision: `expectedAction` (executed action), `observedResult` (the choice the
+observed move makes correct), `success`, `outcomeValue` (move in bps), `startPrice`,
+`endPrice`, `expo`, `endPublishTime`, `isVoid`, `resolvedAt`.
 
-If no valid update is submitted within `t0 + RESOLUTION_TOLERANCE + GRACE`, anyone may
-call `voidOutcome(id)`: all locks released, no rewards or penalties, status RESOLVED with
-`Outcome.isVoid = true`.
+```
+t0           = executedAt + horizon;  resolve allowed when now ≥ t0
+end price    = parsePriceFeedUpdates(update, [MON/USD], t0, t0 + 60)   (else Pyth reverts)
+expo must equal the start expo (ExpoMismatch)
+outcomeValue = (end − start) × 10000 / start
+observed     = outcomeValue < −band ? ACTION_A : outcomeValue > band ? ACTION_B : NO_ACTION
+success      = expectedAction == observed
+```
+
+`voidOutcome` after `t0 + 60 + 300` without a resolution: `isVoid = true`, every lock
+returned, round reward back to the pool, status RESOLVED.
 
 ## 8. Parameters (demo defaults; admin-settable within caps)
 
-| Parameter | Default | Cap |
-|---|---|---|
-| `submissionWindow` | 180 s | 1 h |
-| `horizon` | 180 s | 7 d |
-| `bandBps` | 10 (0.10 %) | 1000 |
-| `thresholdBps` | 6000 | ≥ 5001 |
-| `minActionScore` | 5500 | — |
-| `quorum` | 4 of 5 | ≥ 3 |
-| `lockPerAgent` | 0.05 MON | — |
-| `slashBps` | 3000 | 5000 |
-| `missPenaltyBps` | 1000 | 2000 |
-| `roundReward` | 0.02 MON | pool balance |
-| `actionBps` / `maxMove` | 1000 / 0.5 MON | 2500 / — |
-| `GUARDIAN_WINDOW` | 120 s | — |
-| `RESOLUTION_TOLERANCE` | 60 s | — |
+| Parameter | Default | Cap | Where |
+|---|---|---|---|
+| `submissionWindow` | 180 s | 1 h | per decision |
+| `horizon` | 180 s | 7 d | per decision |
+| `bandBps` | 10 | 1000 | per decision |
+| `thresholdBps` | 6000 | 5001–10000 | per decision |
+| `minActionScore` | 5500 | 10000 | per decision |
+| `quorum` | 4 of 5 | 3–16 | per decision |
+| `questionCount` | 6 | 16 | per decision |
+| `lockPerAgent` | 0.05 MON | > 0 | per decision |
+| `roundReward` | 0.02 MON | pool balance | registry |
+| `slashBps` | 3000 | 5000 | OutcomeRegistry |
+| `missPenaltyBps` | 1000 | 2000 | OutcomeRegistry |
+| `actionBps` / `maxMove` / `cooldown` | 1000 / 0.5 MON / 0 | 2500 / — / — | ExecutionVault |
+| `GUARDIAN_WINDOW` | 120 s | constant | DecisionEngine |
+| `RESOLUTION_TOLERANCE` / `VOID_GRACE` | 60 s / 300 s | constant | OutcomeRegistry |
+| `MAX_PRICE_AGE` (start price) | 60 s | constant | ExecutionVault |
 
 ## 9. Aggregation
 
-See §5. Chosen for: determinism, no floating point, rewards calibrated confidence, and
-a single safe default on every failure path.
+See §5. Chosen for: determinism, no floating point, rewards calibrated confidence, and a
+single safe default on every failure path.
 
 ## 10. Settlement
 
-For each participant with lock `L`, probability `p`:
+For each participant with lock `L`; `p` is the probability of its final submission:
 
 | Result | Condition | Penalty | Reward |
 |---|---|---|---|
-| CORRECT | choice == correctFork | 0 | `pool × p / Σp_correct` |
-| WRONG | choice ∈ {NO_ACTION, DERISK, DEPLOY} ≠ correctFork | `L × slashBps × p / 1e8` | 0 |
-| NEUTRAL | choice == ESCALATE | 0 | 0 |
-| MISSED | no submission | `L × missPenaltyBps / 1e4` | 0 |
+| CORRECT | final choice == observed | 0 | `pool × p / Σp_correct` |
+| WRONG | final choice ∈ {NO_ACTION, ACTION_A, ACTION_B} ≠ observed | `L × slashBps × p / 1e8` | 0 |
+| NEUTRAL | final choice == ESCALATE | 0 | 0 |
+| MISSED | no final submission | `L × missPenaltyBps / 1e4` | 0 |
 
 ```
 pool = Σ penalties + roundReward
-every lock is released; penalties are deducted from the released amount
-if no CORRECT agent: pool → reward pool
+every lock is released; penalties are deducted from it (bond += L − penalty + reward)
+if no CORRECT agent: the whole pool → reward pool
 integer rounding dust → reward pool
 agent.submitted++ for CORRECT/WRONG; agent.correct++ for CORRECT; agent.missed++ for MISSED
 ```
 
-Invariant (tested): `Σ lockReleased − Σ penalty + Σ reward + toRewardPool == Σ locks + roundReward`.
-Rewards and penalties change `Agent.bond` balances (pull-based withdrawal); no push transfers.
+Tested invariants: registry balance == Σ bonds + Σ locked + rewardPool + reservedRewards,
+and a resolved decision neither creates nor destroys value (fuzzed over choices,
+probabilities, skipped submissions and prices).
 
 ## 11. Events
 
-```solidity
-event AgentRegistered(uint16 indexed agentId, address indexed operator, bytes32 nameHash);
-event BondChanged(uint16 indexed agentId, int256 delta, uint256 bond, uint256 locked);
-event DecisionCreated(uint256 indexed id, bytes32 stateHash, bytes32 questionsHash, address proposer);
-event StatusChanged(uint256 indexed id, Status from, Status to);
-event DecisionOpened(uint256 indexed id, uint16[] participants, uint64 deadline, uint256 roundReward);
-event Submitted(uint256 indexed id, uint16 indexed agentId, Fork choice, uint16 score, uint16 probability, bytes32 reasonHash, bytes32 answersRoot);
-event Aggregated(uint256 indexed id, uint256[4] support, Fork leading, bool passed, Fork approved, bool guardianRequired);
-event GuardianDecided(uint256 indexed id, address guardian, Fork fork);
-event Executed(uint256 indexed id, Fork action, uint256 amountMoved, int64 startPrice, uint64 startPublishTime);
-event Resolved(uint256 indexed id, int64 endPrice, int256 moveBps, Fork correctFork);
-event Settled(uint256 indexed id, uint16 indexed agentId, uint8 result, uint256 penalty, uint256 reward);
-```
+| Contract | Events |
+|---|---|
+| DecisionRegistry | `AgentRegistered`, `AgentActiveSet`, `BondChanged`, `RewardPoolChanged`, `RoundRewardSet`, `DecisionCreated`, `DecisionOpened`, `StatusChanged`, `Submitted(id, agentId, questionId, choice, score, probability, bond, reasonHash)`, `Settled` |
+| DecisionEngine | `AgentWeighted(id, agentId, choice, score, probability, reputationBps, weight)`, `Aggregated`, `QuorumFailed`, `GuardianDecided`, `EscalationTimedOut` |
+| ExecutionVault | `Deposited`, `ActionParamsSet`, `Executed`, `EmergencyWithdrawal` |
+| OutcomeRegistry | `PenaltyParamsSet`, `OutcomeRecorded`, `OutcomeVoided` |
 
-## 12. Custom errors (subset)
+## 12. Custom errors
 
-`Unauthorized()`, `InvalidTransition(Status from, Status to)`, `DeadlinePassed()`,
-`DeadlineNotReached()`, `AlreadySubmitted()`, `NotParticipant()`, `ForkNotAllowed(Fork)`,
-`OutOfRange()`, `DuplicateState()`, `InsufficientBond()`, `QuorumUnavailable()`,
-`CooldownActive()`, `PriceOutsideWindow()`, `ExpoMismatch()`, `ParamAboveCap()`.
+Registry: `InvalidTransition(from, to)`, `UnknownDecision`, `UnknownAgent`, `NotAgentOperator`,
+`NotParticipant`, `DeadlinePassed`, `AlreadySubmitted`, `InvalidQuestion`, `InvalidChoice`,
+`ChoiceNotAllowed`, `InvalidScore`, `InvalidProbability`, `InvalidHash`, `InvalidConfig(field)`,
+`DuplicateState`, `QuorumUnavailable`, `InsufficientBond`, `ZeroAmount`, `ZeroAddress`,
+`OperatorInUse`, `TooManyAgents`, `InvalidSettlement(reason)`, `TransferFailed`, `Unauthorized`.
+Engine: `InvalidTransition`, `DeadlineNotReached`, `GuardianNotRequired`, `GuardianWindowClosed`,
+`GuardianWindowOpen`, `InvalidChoice`, `ChoiceNotAllowed`, `NotApproved`.
+Vault: `InvalidTransition`, `CooldownActive`, `IncorrectFee`, `InvalidPrice`, `ParamAboveCap`,
+`InsufficientBalance`, `DirectTransferNotAllowed`. Outcome: `InvalidTransition`,
+`HorizonNotReached`, `GraceNotElapsed`, `IncorrectFee`, `InvalidPrice`, `ExpoMismatch`, `ParamAboveCap`.
+Role failures use OpenZeppelin's `AccessControlUnauthorizedAccount`.
 
-## 13. Tests (Foundry)
+## 13. Tests (Foundry) — `forge test`: 65 passing
 
-- Full lifecycle happy paths for each fork, with a mock Pyth.
-- Every invalid transition reverts with `InvalidTransition`.
-- Submit guards: late, duplicate, wrong operator, non-participant, disallowed fork, ranges.
-- Aggregation: ties, threshold edge (exactly `thresholdBps`), quorum miss, score gate, ESCALATE + guardian + timeout.
-- Settlement invariant fuzzed over probabilities, choices and outcomes.
-- Pyth window: early / late / stale updates revert.
-- Access control on every restricted function; reentrancy on withdrawals.
-- Fork test against the real Pyth on Monad Testnet (read-only) for update parsing.
+| Area | File · contract |
+|---|---|
+| Valid lifecycle (ACTION_A correct with exact settlement numbers, NO_ACTION in band, fail-safe vs. move, cancel) | `Lifecycle.t.sol` · `LifecycleTest` |
+| Invalid transitions, unknown decision, duplicate state, invalid config | `Lifecycle.t.sol` · `InvalidTransitionTest` |
+| Duplicate / expired submissions, invalid choice / score / probability / question / hash, disallowed fork, non-participant | `Submissions.t.sol` · `SubmissionValidationTest` |
+| Unauthorized access on every restricted function, locked bond, pause, direct transfers | `Submissions.t.sol` · `AccessControlTest` |
+| Re-entrant withdrawal | `Submissions.t.sol` · `ReentrancyTest` |
+| Threshold success (exactly at 60 %), threshold failure, score gate, tie-break, reputation weights, quorum failure, escalation + timeout | `Protocol.t.sol` · `AggregationTest` |
+| Execution effects and caps, fee, stale / non-positive price, cooldown, emergency withdrawal | `Protocol.t.sol` · `ExecutionTest` |
+| Outcome recording, horizon, publish-time window, expo mismatch, void | `Protocol.t.sol` · `OutcomeTest` |
+| Settlement: missed penalty, no correct agent, preview == actual, fuzzed conservation | `Protocol.t.sol` · `SettlementTest` |

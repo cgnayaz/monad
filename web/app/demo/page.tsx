@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 const STAGES = [
   { status: "CREATED", step: "Snapshot state and commit hashes", by: "Proposer → DecisionRegistry.createDecision" },
   { status: "OPEN", step: "Lock bonds, open submission window", by: "Proposer → DecisionRegistry.openDecision" },
-  { status: "OPEN", step: "Five agents decide in parallel and submit", by: "Agent operators → DecisionRegistry.submit" },
+  { status: "OPEN", step: "Five agents decide in parallel and submit", by: "Agent operators → DecisionRegistry.submitBatch" },
   { status: "AGGREGATED", step: "Aggregate and evaluate threshold", by: "Keeper → DecisionEngine.aggregate" },
   { status: "APPROVED", step: "Approve bounded action (guardian if escalated)", by: "DecisionEngine" },
   { status: "EXECUTED", step: "Execute approved fork, record start price", by: "Keeper → ExecutionVault.execute" },

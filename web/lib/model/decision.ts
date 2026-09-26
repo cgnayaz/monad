@@ -82,11 +82,16 @@ export interface ParallelDecisions {
   runs: Readonly<Record<AgentKey, AgentRun>>;
 }
 
-/** An agent's final decision as stored on-chain by DecisionRegistry.submit. */
+/**
+ * One answer as stored on-chain by DecisionRegistry.submit / submitBatch. Every question
+ * an agent answers is its own record; the record for question 0 (ACTION) is the agent's
+ * final decision. `answersRoot` of a DecisionBatch is an off-chain payload commitment.
+ */
 export interface SubmissionRecord extends JevPrimitives {
   decisionId: DecisionId;
   agentId: AgentId;
+  questionIndex: number;
   reasonHash: Hex;
-  answersRoot: Hex;
+  bond: Wei;
   submittedAt: UnixSeconds;
 }

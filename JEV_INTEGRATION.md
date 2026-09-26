@@ -18,12 +18,12 @@ Code location: `web/lib/jev/` (TypeScript) and the Jev-derived fields in
 |---|---|---|---|
 | State | `StateRecord` (canonical JSON, versioned) | `model/state.ts`, `jev/state.ts` | `Decision.stateHash` |
 | Questions | `Question` (own id) in a `QuestionSet` | `model/question.ts`, `jev/questions.ts` | `Decision.questionsHash` |
-| Choice | branded `Choice` (fork enum) | `model/primitives.ts` | `Submission.choice` (uint8) |
+| Choice | branded `Choice` (fork enum) | `model/primitives.ts` | `Submission.choice` (`enum Choice`, validated from uint8) |
 | Score | branded `Score`, rubric-derived 0–10000 | `model/primitives.ts`, `jev/score.ts` | `Submission.score` (uint16) |
 | Probability | branded `Probability`, 100–9900 bps | `model/primitives.ts` | `Submission.probability` (uint16) |
 | Reason | human-readable text | `jev/primitives.ts` | `Submission.reasonHash` |
-| Parallel Decisions | `ParallelDecisions` (one `AgentRun` per agent) | `jev/parallel.ts` | 5 independent `submit` txs |
-| Batch Decisions | `DecisionBatch` of `AgentDecision`s | `jev/batch.ts` | `Submission.answersRoot` (Merkle) |
+| Parallel Decisions | `ParallelDecisions` (one `AgentRun` per agent) | `jev/parallel.ts` | 5 independent `submitBatch` txs, one per operator |
+| Batch Decisions | `DecisionBatch` of `AgentDecision`s | `jev/batch.ts` | `submitBatch`: one `Submission` per (agent, question) |
 | Bounded Forks | fixed 4-fork set + per-decision mask | `jev/forks.ts` | `Decision.allowedForks`, `Fork` enum |
 | Action | `Action` → entry of `ACTION_SPACE` | `model/action.ts`, `jev/action.ts` | `ExecutionVault.execute` |
 | Verify | `Outcome` + integrity checks | `model/outcome.ts`, `jev/verify.ts` | `OutcomeRegistry.resolve` |
@@ -85,7 +85,7 @@ interface Question {                 // web/lib/model/question.ts — a template
   text: string;                      // shown verbatim in the UI
   category: "ACTION" | "RISK" | "YIELD" | "SECURITY" | "MARKET" | "HISTORY";
   createdAt: number;
-  index: number;                     // 0..5, uint8 slot in Merkle leaves
+  index: number;                     // 0..5, the on-chain uint8 questionId
   inputKeys: string[];               // relevant state input prefixes
   rubric: RubricFactor[];            // produce the deterministic score
   allowedForks: Fork[];
@@ -185,7 +185,13 @@ by the admin — never by the AI. No fork accepts calldata, addresses or amounts
 ## 9. Batch Decisions
 
 One round is a batch of related decisions. Every answer is a full Jev decision with
-provenance:
+provenance, and each agent submits its whole batch in one transaction
+(`DecisionRegistry.submitBatch`). The contract stores one `Submission` per
+(decision, agent, question) with its choice, score, probability, reasonHash and bond, so
+question-level provenance lives on-chain; only the ACTION answer is aggregated.
+
+The off-chain payload additionally commits the batch as a Merkle root, so a published
+AgentRun can be checked as a unit:
 
 ```
 leaf = keccak256(bytes.concat(keccak256(abi.encode(
@@ -196,10 +202,9 @@ answersRoot = MerkleRoot(leaves of this agent)      // OpenZeppelin StandardMerk
 
 Default assignment: each agent answers its primary question and question 0 (ACTION).
 The batch therefore holds 10 answers; the matrix `state × question × agent × choice ×
-score × probability × reason` is fully reconstructible. The ACTION answer is also stored
-in contract storage in plain form; any other answer can be proven against `answersRoot`
-with a Merkle proof, and the UI does so in the audit view. Aggregation never discards the
-per-agent submissions: they stay in storage and events.
+score × probability × reason` is fully reconstructible from contract storage plus the
+published reasons. Aggregation never discards the per-question submissions: they stay in
+storage and in `Submitted` events.
 
 ## 10. Action
 
@@ -221,7 +226,7 @@ Two distinct verifications:
    ```
    Settlement follows deterministically (CONTRACT_SPEC.md §10).
 2. **Integrity verification (audit).** The browser recomputes `stateHash`,
-   `questionsHash`, each `reasonHash`, each answer leaf and each `answersRoot` from the
+   `questionsHash` and each `reasonHash` from the
    published payloads and compares them to chain. Results are shown per item as
    `VERIFIED` / `MISMATCH` / `UNAVAILABLE`.
 

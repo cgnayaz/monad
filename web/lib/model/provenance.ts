@@ -34,6 +34,7 @@ export interface DecisionConfig {
   minActionScore: number;
   quorum: number;
   allowedForks: number;
+  questionCount: number;
   lockPerAgent: Wei;
 }
 
@@ -58,7 +59,7 @@ export interface DecisionProvenance {
   state: StateRecord | StateRef;
   questions: QuestionSet | QuestionSetRef;
   agents: AgentRef[];
-  /** Final decisions as submitted on-chain, one per participant that submitted. */
+  /** Every answer submitted on-chain (all questions, all agents). */
   submissions: SubmissionRecord[];
   /** Every agent's full batch, when the off-chain payloads are available. */
   parallel: ParallelDecisions | null;
@@ -66,6 +67,11 @@ export interface DecisionProvenance {
   action: Action | null;
   outcome: Outcome | null;
   settlement: Settlement | null;
+}
+
+/** An agent's final decision on-chain: its answer to question 0 (ACTION). */
+export function finalSubmission(p: DecisionProvenance, agentId: AgentId): SubmissionRecord | undefined {
+  return p.submissions.find((s) => s.agentId === agentId && s.questionIndex === 0);
 }
 
 export const isFullState = (s: StateRecord | StateRef): s is StateRecord => "data" in s;
@@ -104,7 +110,8 @@ function txFor(p: DecisionProvenance, status: Status): TxRef | null {
  */
 export function traceDecision(p: DecisionProvenance, agentId: AgentId): ProvenanceStep[] {
   const agent = p.agents.find((a) => a.agentId === agentId);
-  const submission = p.submissions.find((s) => s.agentId === agentId);
+  const submission = finalSubmission(p, agentId);
+  const answered = p.submissions.filter((s) => s.agentId === agentId).length;
   const run = p.parallel ? Object.values(p.parallel.runs).find((r) => r.agentId === agentId) : undefined;
   const final: AgentDecision | null = run?.final ?? null;
   const question = isFullQuestionSet(p.questions) && final ? p.questions.questions.find((q) => q.questionId === final.questionId) : undefined;
@@ -134,9 +141,9 @@ export function traceDecision(p: DecisionProvenance, agentId: AgentId): Provenan
       stage: "DECISION",
       status: submission ? "present" : "pending",
       ref: submission
-        ? `${submission.choice} · score ${submission.score} · p ${submission.probability}`
-        : "no submission",
-      hash: submission?.answersRoot,
+        ? `${submission.choice} · score ${submission.score} · p ${submission.probability} · bond ${submission.bond} · ${answered} answer(s)`
+        : "no final submission",
+      hash: submission?.reasonHash,
     },
     {
       stage: "AGGREGATION",
@@ -196,35 +203,44 @@ export function validateProvenance(p: DecisionProvenance): string[] {
   }
 
   const participants = new Set(p.decision.participants);
+  const seen = new Set<string>();
   for (const s of p.submissions) {
     if (s.decisionId !== id) issues.push(`submission of agent ${s.agentId} references decision ${s.decisionId}`);
     if (!participants.has(s.agentId)) issues.push(`agent ${s.agentId} submitted without being a participant`);
+    if (s.questionIndex >= p.decision.config.questionCount) issues.push(`agent ${s.agentId} answered unknown question ${s.questionIndex}`);
+    const key = `${s.agentId}:${s.questionIndex}`;
+    if (seen.has(key)) issues.push(`duplicate answer ${key}`);
+    seen.add(key);
   }
 
   if (p.parallel) {
     if (p.parallel.decisionId !== id) issues.push("parallel run set references another decision");
     for (const run of Object.values(p.parallel.runs)) {
-      const onChain = p.submissions.find((s) => s.agentId === run.agentId);
       if (!run.batch || !run.final) continue;
       for (const d of run.batch.decisions) {
         if (d.decisionId !== id || d.agentId !== run.agentId) issues.push(`batch ${run.batch.batchId} contains a foreign decision`);
         if (isFullQuestionSet(p.questions) && !p.questions.questions.some((q) => q.questionId === d.questionId)) {
           issues.push(`decision on unknown question ${d.questionId}`);
         }
-      }
-      if (onChain) {
-        if (onChain.answersRoot.toLowerCase() !== run.batch.answersRoot.toLowerCase()) issues.push(`agent ${run.agentId}: answersRoot differs from chain`);
-        if (onChain.choice !== run.final.choice || onChain.score !== run.final.score || onChain.probability !== run.final.probability) {
-          issues.push(`agent ${run.agentId}: final decision differs from chain`);
+        const onChain = p.submissions.find((s) => s.agentId === d.agentId && s.questionIndex === d.questionIndex);
+        if (!onChain) continue; // not (yet) submitted
+        if (
+          onChain.choice !== d.choice ||
+          onChain.score !== d.score ||
+          onChain.probability !== d.probability ||
+          onChain.reasonHash.toLowerCase() !== d.reasonHash.toLowerCase()
+        ) {
+          issues.push(d.questionIndex === 0 ? `agent ${d.agentId}: final decision differs from chain` : `agent ${d.agentId}: answer to question ${d.questionIndex} differs from chain`);
         }
       }
     }
   }
 
   if (p.aggregation) {
-    if (p.aggregation.submissions !== p.submissions.length) issues.push("aggregation submission count differs from submissions");
+    const finals = p.submissions.filter((s) => s.questionIndex === 0);
+    if (p.aggregation.submissions !== finals.length) issues.push("aggregation submission count differs from final submissions");
     for (const i of p.aggregation.inputs) {
-      const s = p.submissions.find((x) => x.agentId === i.agentId);
+      const s = finals.find((x) => x.agentId === i.agentId);
       if (!s || s.choice !== i.choice) issues.push(`aggregation input for agent ${i.agentId} does not match its submission`);
     }
   }

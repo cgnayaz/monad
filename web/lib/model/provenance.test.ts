@@ -59,19 +59,24 @@ function fixture(): DecisionProvenance {
   ) as Record<AgentKey, AgentRun>;
   const parallel: ParallelDecisions = { decisionId, stateId: state.stateId, questionSetHash: questions.hash, runs };
 
-  const submissions = Object.values(runs).map((r) => ({
-    decisionId,
-    agentId: r.agentId,
-    choice: r.final!.choice,
-    score: r.final!.score,
-    probability: r.final!.probability,
-    reasonHash: r.final!.reasonHash,
-    answersRoot: r.batch!.answersRoot,
-    submittedAt: NOW + 20,
-  }));
+  // On-chain: every answer of every batch is its own submission record.
+  const submissions = Object.values(runs).flatMap((r) =>
+    r.batch!.decisions.map((d) => ({
+      decisionId,
+      agentId: d.agentId,
+      questionIndex: d.questionIndex,
+      choice: d.choice,
+      score: d.score,
+      probability: d.probability,
+      reasonHash: d.reasonHash,
+      bond: BOND,
+      submittedAt: NOW + 20,
+    })),
+  );
+  const finals = submissions.filter((s) => s.questionIndex === 0);
   const aggregation = aggregate(
     decisionId,
-    submissions.map((s) => ({ ...s, agentSubmitted: 0, agentCorrect: 0 })),
+    finals.map((s) => ({ ...s, agentSubmitted: 0, agentCorrect: 0 })),
     { thresholdBps: 6000, minActionScore: 5500, quorum: 4 },
   );
   const action = resolveAction(aggregation)!;
@@ -92,7 +97,7 @@ function fixture(): DecisionProvenance {
   });
   const settlement = settle(
     decisionId,
-    submissions.map((s) => ({ agentId: s.agentId, bond: BOND, submission: { choice: s.choice, probability: s.probability } })),
+    finals.map((s) => ({ agentId: s.agentId, bond: BOND, submission: { choice: s.choice, probability: s.probability } })),
     outcome.observedResult!.correctFork,
     { slashBps: 3000, missPenaltyBps: 1000, roundReward: 0n },
   );
@@ -104,7 +109,7 @@ function fixture(): DecisionProvenance {
       stateHash: state.hash,
       questionsHash: questions.hash,
       proposer: "0x0000000000000000000000000000000000000001",
-      config: { submissionWindow: 180, horizon: 180, bandBps: 10, thresholdBps: 6000, minActionScore: 5500, quorum: 4, allowedForks: 15, lockPerAgent: BOND },
+      config: { submissionWindow: 180, horizon: 180, bandBps: 10, thresholdBps: 6000, minActionScore: 5500, quorum: 4, allowedForks: 15, questionCount: 6, lockPerAgent: BOND },
       createdAt: NOW,
       openedAt: NOW,
       deadline: NOW + 180,
@@ -139,9 +144,20 @@ describe("Provenance", () => {
     expect(traceDecision(p, 1)[8].ref).toContain("WRONG");
   });
 
+  it("flags a tampered non-final answer and duplicate answers", () => {
+    const p = fixture();
+    const i = p.submissions.findIndex((s) => s.questionIndex !== 0);
+    p.submissions[i] = { ...p.submissions[i], probability: 9900 as typeof p.submissions[number]["probability"] };
+    expect(validateProvenance(p).some((x) => x.includes(`answer to question ${p.submissions[i].questionIndex} differs`))).toBe(true);
+    const q = fixture();
+    q.submissions.push({ ...q.submissions[0] });
+    expect(validateProvenance(q).some((x) => x.startsWith("duplicate answer"))).toBe(true);
+  });
+
   it("flags a broken link", () => {
     const p = fixture();
-    p.submissions[0] = { ...p.submissions[0], choice: "DEPLOY" };
+    const i = p.submissions.findIndex((s) => s.questionIndex === 0);
+    p.submissions[i] = { ...p.submissions[i], choice: "DEPLOY" };
     expect(validateProvenance(p).some((i) => i.includes("final decision differs from chain"))).toBe(true);
 
     const q = fixture();

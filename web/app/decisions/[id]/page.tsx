@@ -13,7 +13,7 @@ import { explorer } from "@/lib/chain/monad";
 import { getDecisionProvenance } from "@/lib/data/decisions";
 import { formatBps, formatDuration, formatMon, formatPrice, formatUtc } from "@/lib/format";
 import { maskToForks } from "@/lib/jev/forks";
-import { traceDecision, validateProvenance } from "@/lib/model/provenance";
+import { finalSubmission, traceDecision, validateProvenance } from "@/lib/model/provenance";
 import { FORKS } from "@/lib/types/protocol";
 
 export const dynamic = "force-dynamic";
@@ -102,7 +102,7 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
         </Panel>
       </Section>
 
-      <Section id="decisions" index="03" title="Decisions" description="Each agent's final decision as stored on-chain. Agents that did not submit remain listed.">
+      <Section id="decisions" index="03" title="Decisions" description="Each agent's final decision (its answer to the ACTION question) as stored on-chain, with the number of questions it answered in its batch. Agents that did not submit remain listed.">
         <Table caption="Agent decisions">
           <thead>
             <tr>
@@ -112,22 +112,23 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
               <Th align="right">Probability</Th>
               <Th align="right">Bond (MON)</Th>
               <Th>Reason hash</Th>
-              <Th>Answers root</Th>
+              <Th align="right">Answers</Th>
               <Th>Submitted</Th>
             </tr>
           </thead>
           <tbody>
             {d.participants.map((agentId) => {
-              const s = p.submissions.find((x) => x.agentId === agentId);
+              const s = finalSubmission(p, agentId);
+              const answers = p.submissions.filter((x) => x.agentId === agentId).length;
               return (
                 <tr key={agentId}>
                   <Td className="whitespace-nowrap font-medium">{agentName(agentId)}</Td>
                   <Td mono>{s?.choice ?? <StatusMark tone="fail">missed</StatusMark>}</Td>
                   <Td align="right" mono>{s ? s.score : "—"}</Td>
                   <Td align="right" mono>{s ? formatBps(s.probability) : "—"}</Td>
-                  <Td align="right" mono>{formatMon(d.config.lockPerAgent)}</Td>
+                  <Td align="right" mono>{formatMon(s?.bond ?? d.config.lockPerAgent)}</Td>
                   <Td>{s ? <Hash value={s.reasonHash} /> : "—"}</Td>
-                  <Td>{s ? <Hash value={s.answersRoot} /> : "—"}</Td>
+                  <Td align="right" mono>{answers}/{d.config.questionCount}</Td>
                   <Td mono className="text-ink-2">{s ? formatUtc(s.submittedAt) : "—"}</Td>
                 </tr>
               );

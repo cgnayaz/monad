@@ -105,7 +105,7 @@ export async function getDecisionProvenance(id: bigint): Promise<Availability<De
       decisionId,
       status,
       stateHash: r.stateHash,
-      questionsHash: r.questionsHash,
+      questionsHash: r.questionSetHash,
       proposer: r.proposer,
       config: {
         submissionWindow: Number(r.config.submissionWindow),
@@ -115,6 +115,7 @@ export async function getDecisionProvenance(id: bigint): Promise<Availability<De
         minActionScore: r.config.minActionScore,
         quorum: r.config.quorum,
         allowedForks: r.config.allowedForks,
+        questionCount: r.config.questionCount,
         lockPerAgent: r.config.lockPerAgent,
       },
       createdAt: Number(r.createdAt),
@@ -133,19 +134,24 @@ export async function getDecisionProvenance(id: bigint): Promise<Availability<De
       }),
     );
 
+    // Every (participant, question) slot; empty slots have submittedAt = 0.
+    const slots = participants.flatMap((agentId) =>
+      Array.from({ length: decision.config.questionCount }, (_, q) => [agentId, q] as const),
+    );
     const submissions: SubmissionRecord[] = (
       await Promise.all(
-        participants.map(async (agentId) => {
-          const s = await publicClient.readContract({ address: addr.DecisionRegistry, abi: decisionRegistryAbi, functionName: "getSubmission", args: [id, agentId] });
+        slots.map(async ([agentId, q]) => {
+          const s = await publicClient.readContract({ address: addr.DecisionRegistry, abi: decisionRegistryAbi, functionName: "getSubmission", args: [id, agentId, q] });
           if (s.submittedAt === 0n) return null;
           return {
             decisionId,
             agentId,
+            questionIndex: s.questionId,
             choice: forkFromIndex(s.choice),
             score: toScore(s.score),
             probability: toProbability(s.probability),
             reasonHash: s.reasonHash,
-            answersRoot: s.answersRoot,
+            bond: s.bond,
             submittedAt: Number(s.submittedAt),
           } satisfies SubmissionRecord;
         }),
@@ -202,17 +208,17 @@ export async function getDecisionProvenance(id: bigint): Promise<Availability<De
       const observed = o.isVoid
         ? null
         : {
-            start: action.execution.startPrice,
-            end: { price: o.endPrice, expo: action.execution.startPrice.expo, publishTime: Number(o.endPublishTime) },
-            moveBps: o.moveBps,
+            start: { price: o.startPrice, expo: o.expo, publishTime: action.execution.startPrice.publishTime },
+            end: { price: o.endPrice, expo: o.expo, publishTime: Number(o.endPublishTime) },
+            moveBps: o.outcomeValue,
             bandBps: decision.config.bandBps,
-            correctFork: executable(forkFromIndex(o.correctFork)),
+            correctFork: executable(forkFromIndex(o.observedResult)),
           };
       outcome = {
         decisionId,
         expectedAction: action.fork,
         observedResult: observed,
-        success: observed ? observed.correctFork === action.fork : null,
+        success: observed ? o.success : null,
         verificationSource: {
           kind: "pyth",
           chainId: MONAD_TESTNET.id,

@@ -74,7 +74,7 @@ Full pipeline, with the component responsible for each step:
 | commit | `DecisionRegistry.createDecision(stateHash, questionsHash, config)` | Monad |
 | PARALLEL DECISIONS | 5 isolated `DecisionProvider.evaluate()` calls, `Promise.allSettled` | server |
 | CHOICE/SCORE/PROBABILITY | model output validated by Zod; score computed deterministically from rubric | server |
-| BATCH | all answers → Merkle tree → `answersRoot` | server |
+| BATCH | all answers of an agent → one `submitBatch` tx (one on-chain record per question) | server → Monad |
 | submission | each agent's operator key calls `DecisionRegistry.submit(...)` | Monad |
 | DECISION ENGINE + THRESHOLD | `DecisionEngine.aggregate(id)` — pure integer math on-chain | Monad |
 | BOUNDED ACTION | `ExecutionVault.execute(id, pythUpdate)` — only the approved fork | Monad |
@@ -190,7 +190,7 @@ limits) is marked *to verify* in [DEPLOYMENT.md](DEPLOYMENT.md).
 - The five agents' operator keys are held by the DecMarkt server. The system proves what
   was submitted and settles it; it does not prove the server relayed the model output
   faithfully. Mitigation: full model output is published and hashed (`reasonHash`,
-  `answersRoot`); see SECURITY_MODEL.md §4.
+  per-question on-chain submissions); see SECURITY_MODEL.md §4.
 - The proposer chooses what goes into the state. The state is published and hashed before
   agents run, so it cannot be changed after the fact, but its selection is trusted.
 - Demo horizons are short (minutes). Short-horizon price moves are close to noise; the
