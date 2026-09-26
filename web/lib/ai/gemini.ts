@@ -94,6 +94,7 @@ function classify(err: unknown, signal: AbortSignal, model: string): ProviderErr
   if (err instanceof ApiError) {
     if (err.status === 400 && /api key/i.test(err.message)) return new ProviderError("provider_error", "Sağlayıcı API anahtarını reddetti (GEMINI_API_KEY geçersiz)");
     if (err.status === 400 && /location is not supported/i.test(err.message)) return new ProviderError("provider_error", "Gemini API bu sunucu bölgesinde kullanılamıyor");
+    if (err.status === 402) return new ProviderError("provider_error", "Gemini hesabının ön ödemeli kredisi bitti (AI Studio → Billing ya da yeni projede yeni anahtar)");
     if (err.status === 401 || err.status === 403) return new ProviderError("provider_error", "Sağlayıcı bu anahtara erişim izni vermedi");
     if (err.status === 404) return new ProviderError("provider_error", `${model} modeli bu anahtar için kullanılamıyor`);
     if (err.status === 429) return new ProviderError("provider_error", "Sağlayıcı kotası veya hız sınırı doldu");

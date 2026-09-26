@@ -62,11 +62,12 @@ export async function askDecMarkt(question: string, signal: AbortSignal): Promis
       last = err;
       console.error(`ask: ${model} failed:`, publicError(err, "unknown"));
       // Try the next model on anything but a rejected key or a bad request.
-      if (err instanceof AskError || (err instanceof ApiError && [400, 401, 403].includes(err.status)) || signal.aborted) break;
+      if (err instanceof AskError || (err instanceof ApiError && [400, 401, 402, 403].includes(err.status)) || signal.aborted) break;
     }
   }
   if (last instanceof AskError) throw last;
   if (signal.aborted) throw new AskError("Yanıt zamanında gelmedi, tekrar deneyin.");
+  if (last instanceof ApiError && last.status === 402) throw new AskError("Gemini hesabının ön ödemeli kredisi bitti. AI Studio'dan kredi yükleyin ya da yeni bir projede yeni anahtar oluşturup Vercel'deki GEMINI_API_KEY'i güncelleyin.");
   if (last instanceof ApiError && last.status === 429) throw new AskError("Gemini kotası doldu, birazdan tekrar deneyin.");
   if (last instanceof ApiError && (last.status === 400 || last.status === 401 || last.status === 403)) throw new AskError("Gemini anahtarı reddedildi.");
   const status = last instanceof ApiError ? `HTTP ${last.status}: ` : "";
