@@ -1,103 +1,89 @@
 import Link from "next/link";
-import { AgentTable } from "@/components/domain/agent-table";
-import { DecisionTable } from "@/components/domain/decision-table";
-import { LifecycleRail } from "@/components/domain/lifecycle-rail";
-import { NotDeployed } from "@/components/domain/not-deployed";
+import { CurrentDecision } from "@/components/decision/current-decision";
+import { QuestionsPanel, StatePanel } from "@/components/decision/panels";
 import { ReadinessPanel } from "@/components/domain/readiness-panel";
 import { LinkButton } from "@/components/ui/button";
 import { PageHeader, Section } from "@/components/ui/layout";
-import { EmptyState } from "@/components/ui/status";
-import { listAgents } from "@/lib/data/agents";
-import { listDecisions } from "@/lib/data/decisions";
+import { collectState } from "@/lib/collectors";
+import { getDecisionProvenance, listDecisions } from "@/lib/data/decisions";
+import { attachVerifiedPayloads } from "@/lib/data/payloads";
 import { readiness } from "@/lib/data/readiness";
+import { toWireJson } from "@/lib/engine/wire";
+import { buildQuestionSet } from "@/lib/jev/questions";
+import { fromProvenance, fromRound, type DecisionView } from "@/lib/view/decision-view";
 
 export const dynamic = "force-dynamic";
 
-const LAYERS = [
-  {
-    name: "Jev",
-    role: "Structures decisions",
-    items: ["Hashed, sourced state", "Explicit questions and rubrics", "Choice · Score · Probability · Reason", "Parallel, batched, bounded"],
-  },
-  {
-    name: "DecMarkt",
-    role: "Makes decisions accountable",
-    items: ["Agent identity and bonds", "Deterministic aggregation", "Threshold before any action", "Reward and penalty by rule"],
-  },
-  {
-    name: "Monad",
-    role: "Makes the result enforceable",
-    items: ["Lifecycle in contract state", "Bounded execution only", "Oracle-verified outcome", "Public, auditable settlement"],
-  },
-];
+async function latestChainDecision(): Promise<{ view: DecisionView | null; note: string }> {
+  const list = await listDecisions(1);
+  if (list.status === "unavailable") return { view: null, note: `${list.reason}.` };
+  const latest = list.value[0];
+  if (!latest) return { view: null, note: "No decision has been recorded on-chain yet." };
+  const p = await getDecisionProvenance(latest.id);
+  if (p.status !== "ok" || !p.value) return { view: null, note: p.status === "unavailable" ? p.reason : "Decision not found." };
+  const verified = await attachVerifiedPayloads(p.value);
+  return { view: fromProvenance(verified.provenance, verified.checks), note: "" };
+}
 
 export default async function DashboardPage() {
-  const [decisions, agents] = await Promise.all([listDecisions(10), listAgents()]);
+  const [chain, state] = await Promise.all([latestChainDecision(), collectState()]);
+  const questions = buildQuestionSet(state, state.timestamp);
+  const snapshot = fromRound({
+    state: JSON.parse(toWireJson(state)),
+    questions: JSON.parse(toWireJson(questions)),
+    runs: {},
+    running: {},
+    submissions: {},
+    decision: null,
+  });
   const r = readiness();
 
   return (
     <>
       <PageHeader
-        eyebrow="DecMarkt"
+        eyebrow="DecMarkt · Monad Testnet"
         title="AI decisions with on-chain accountability."
-        lead="Five independent analysts decide on a hashed state. Their decisions are bonded, aggregated by deterministic rules, executed only within bounded actions, and settled against a verified outcome on Monad."
+        lead="Jev structures each decision. DecMarkt bonds the agents that make it and applies fixed rules to their output. Monad enforces the bounded action and records the verified outcome."
         aside={
           <div className="flex gap-3">
-            <LinkButton href="/demo" variant="primary">Open live demo</LinkButton>
+            <LinkButton href="/demo" variant="primary">
+              Run a round
+            </LinkButton>
             <LinkButton href="/how-it-works">How it works</LinkButton>
           </div>
         }
       />
 
-      <div className="mb-14 grid border border-rule bg-surface md:grid-cols-3">
-        {LAYERS.map((l, i) => (
-          <div key={l.name} className={`px-5 py-5 ${i > 0 ? "border-t border-rule md:border-l md:border-t-0" : ""}`}>
-            <p className="label">Layer {i + 1}</p>
-            <p className="mt-2 text-[17px] font-medium">{l.name}</p>
-            <p className="text-ink-2">{l.role}</p>
-            <ul className="mt-4 space-y-1.5 text-[13px]">
-              {l.items.map((it) => (
-                <li key={it} className="flex gap-2">
-                  <span aria-hidden className="mt-[9px] inline-block h-px w-3 shrink-0 bg-ink-3" />
-                  {it}
-                </li>
-              ))}
-            </ul>
+      <Section title="Current decision">
+        <CurrentDecision chain={chain.view} chainNote={chain.note} />
+      </Section>
+
+      <Section
+        title="Current state"
+        description="Collected now from Pyth, Monad and the DecMarkt contracts. The next round commits exactly this snapshot (hash below) before any agent runs."
+        aside={
+          <Link href="/demo" className="text-[13px] text-ink-2 hover:text-ink">
+            Use it in a round →
+          </Link>
+        }
+      >
+        <div className="space-y-8">
+          <div className="min-w-0">
+            <h3 className="mb-2.5 text-[13px] font-semibold">State</h3>
+            <StatePanel v={snapshot} />
           </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0">
-          <Section index="01" title="Latest decisions" aside={<Link href="/decisions" className="text-[13px] text-ink-2 hover:text-ink">All decisions</Link>}>
-            {decisions.status === "unavailable" ? (
-              <>
-                <div className="mb-4">
-                  <LifecycleRail />
-                </div>
-                <NotDeployed what="decisions" />
-              </>
-            ) : decisions.value.length === 0 ? (
-              <EmptyState title="No decisions recorded">
-                The contracts are live but no decision has been created. Start one from the demo.
-              </EmptyState>
-            ) : (
-              <DecisionTable rows={decisions.value} />
-            )}
-          </Section>
-
-          <Section index="02" title="Agents" aside={<Link href="/agents" className="text-[13px] text-ink-2 hover:text-ink">Agent records</Link>}>
-            <AgentTable agents={agents} />
-          </Section>
+          <div className="min-w-0">
+            <h3 className="mb-2.5 text-[13px] font-semibold">Questions generated from it</h3>
+            <QuestionsPanel v={snapshot} />
+          </div>
         </div>
+      </Section>
 
-        <aside>
+      <Section title="System" description="What a round can do right now. Presence of configuration only; secrets never reach the browser.">
+        <div className="max-w-[640px]">
           <ReadinessPanel r={r} />
-          <p className="mt-3 text-[12px] leading-5 text-ink-3">
-            Presence of configuration only. Secrets are never sent to the browser.
-          </p>
-        </aside>
-      </div>
+        </div>
+      </Section>
     </>
   );
 }

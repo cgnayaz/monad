@@ -1,20 +1,32 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { AgentModules } from "@/components/decision/agent-modules";
+import { JevTrack } from "@/components/decision/jev-track";
+import { KeyFigures } from "@/components/decision/key-figures";
+import {
+  ActionPanel,
+  AggregationPanel,
+  IntegrityPanel,
+  OutcomePanel,
+  QuestionsPanel,
+  SettlementPanel,
+  StatePanel,
+  TransitionsTable,
+} from "@/components/decision/panels";
 import { statusTone } from "@/components/domain/decision-table";
 import { LifecycleRail } from "@/components/domain/lifecycle-rail";
 import { NotDeployed } from "@/components/domain/not-deployed";
 import { ProvenanceTrail } from "@/components/domain/provenance-trail";
-import { SupportBars } from "@/components/domain/support-bars";
 import { Hash } from "@/components/ui/hash";
-import { KeyValue, PageHeader, Panel, Section } from "@/components/ui/layout";
-import { EmptyState, StatusMark, Unavailable } from "@/components/ui/status";
-import { Table, Td, Th } from "@/components/ui/table";
+import { PageHeader, Section } from "@/components/ui/layout";
+import { EmptyState, StatusMark } from "@/components/ui/status";
 import { explorer } from "@/lib/chain/monad";
 import { getDecisionProvenance } from "@/lib/data/decisions";
-import { formatBps, formatDuration, formatMon, formatPrice, formatUtc } from "@/lib/format";
+import { attachVerifiedPayloads } from "@/lib/data/payloads";
+import { formatDuration, formatMon, formatUtc } from "@/lib/format";
 import { maskToForks } from "@/lib/jev/forks";
-import { finalSubmission, traceDecision, validateProvenance } from "@/lib/model/provenance";
-import { FORKS } from "@/lib/types/protocol";
+import { traceDecision, validateProvenance } from "@/lib/model/provenance";
+import { fromProvenance } from "@/lib/view/decision-view";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +35,18 @@ export async function generateMetadata(props: PageProps<"/decisions/[id]">): Pro
   return { title: `Decision #${id}` };
 }
 
-const PAYLOAD_NOTE = "Off-chain payload store is not connected yet; only on-chain values are shown.";
+const SECTIONS = [
+  ["state", "State"],
+  ["questions", "Questions"],
+  ["decisions", "Agent decisions"],
+  ["aggregation", "Aggregation"],
+  ["action", "Action"],
+  ["transactions", "Transactions"],
+  ["outcome", "Outcome"],
+  ["settlement", "Settlement"],
+  ["integrity", "Integrity"],
+  ["provenance", "Provenance"],
+] as const;
 
 export default async function DecisionPage(props: PageProps<"/decisions/[id]">) {
   const { id: raw } = await props.params;
@@ -33,219 +56,108 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
   if (res.status === "unavailable") {
     return (
       <>
-        <PageHeader eyebrow="Decision" title={`Decision #${raw}`} />
+        <PageHeader eyebrow="Decision record" title={`Decision #${raw}`} />
         {res.reason.startsWith("Contracts") ? <NotDeployed what="decision records" /> : <EmptyState title="Decision unavailable">{res.reason}</EmptyState>}
       </>
     );
   }
-  const p = res.value;
-  if (!p) notFound();
+  if (!res.value) notFound();
 
+  const verified = await attachVerifiedPayloads(res.value);
+  const p = verified.provenance;
+  const v = fromProvenance(p, verified.checks);
   const d = p.decision;
-  const agentName = (id: number) => p.agents.find((a) => a.agentId === id)?.name ?? `Agent ${id}`;
   const issues = validateProvenance(p);
-  const exec = p.action?.execution ?? null;
-
-  const sections = [
-    ["state", "State"],
-    ["questions", "Questions"],
-    ["decisions", "Decisions"],
-    ["aggregation", "Aggregation"],
-    ["action", "Action"],
-    ["outcome", "Outcome"],
-    ["settlement", "Settlement"],
-    ["provenance", "Provenance"],
-  ] as const;
+  const n = (i: number) => String(i + 1).padStart(2, "0");
 
   return (
     <>
       <PageHeader
-        eyebrow="Decision"
+        eyebrow="Decision record · Monad Testnet"
         title={`Decision #${d.decisionId}`}
-        lead={`Created ${formatUtc(d.createdAt)} by ${d.proposer}. ${d.participants.length} participating agents.`}
+        lead={
+          <span className="font-mono text-[13px]">
+            created {formatUtc(d.createdAt)} · proposer <a className="underline decoration-rule underline-offset-2 hover:decoration-ink" href={explorer.address(d.proposer)} target="_blank" rel="noreferrer">{d.proposer}</a>
+          </span>
+        }
         aside={<StatusMark tone={statusTone(d.status)}>{d.status}</StatusMark>}
       />
 
-      <div className="mb-10">
+      <div className="mb-6">
         <LifecycleRail current={d.status} transitions={d.transitions} />
       </div>
+      <div className="mb-6">
+        <JevTrack stages={v.stages} />
+      </div>
+      <div className="mb-10">
+        <KeyFigures v={v} />
+      </div>
 
-      <nav aria-label="Sections" className="mb-10 flex flex-wrap gap-x-5 gap-y-2 border-b border-rule pb-3 text-[13px] text-ink-2">
-        {sections.map(([anchor, label]) => (
-          <a key={anchor} href={`#${anchor}`} className="hover:text-ink">
+      <nav aria-label="Record sections" className="sticky top-0 z-10 -mx-4 mb-10 flex gap-x-5 overflow-x-auto border-b border-rule bg-bg/95 px-4 py-2.5 text-[13px] text-ink-2 [scrollbar-width:none] sm:-mx-6 sm:px-6">
+        {SECTIONS.map(([anchor, label]) => (
+          <a key={anchor} href={`#${anchor}`} className="whitespace-nowrap hover:text-ink">
             {label}
           </a>
         ))}
       </nav>
 
-      <Section id="state" index="01" title="State" description="The state hash committed before any agent ran.">
-        <Panel>
-          <KeyValue
-            rows={[
-              { k: "State hash", v: <Hash value={d.stateHash} full /> },
-              { k: "Inputs", v: <Unavailable reason={PAYLOAD_NOTE} /> },
-              { k: "Horizon", v: formatDuration(d.config.horizon) },
-              { k: "Band", v: `±${d.config.bandBps} bps` },
-            ]}
-          />
-        </Panel>
+      <Section id="state" index={n(0)} title="State" description="The snapshot the agents evaluated. Its hash was committed before any agent ran.">
+        <StatePanel v={v} />
       </Section>
 
-      <Section id="questions" index="02" title="Questions">
-        <Panel>
-          <KeyValue
-            rows={[
-              { k: "Questions hash", v: <Hash value={d.questionsHash} full /> },
-              { k: "Allowed forks", v: <span className="font-mono text-[12.5px]">{maskToForks(d.config.allowedForks).join(" · ")}</span> },
-            ]}
-          />
-        </Panel>
+      <Section
+        id="questions"
+        index={n(1)}
+        title="Questions"
+        description={`${v.questions.items?.length ?? "—"} questions · allowed forks ${maskToForks(d.config.allowedForks).join(" · ")} · horizon ${formatDuration(d.config.horizon)} · band ±${d.config.bandBps} bps`}
+      >
+        <QuestionsPanel v={v} />
       </Section>
 
-      <Section id="decisions" index="03" title="Decisions" description="Each agent's final decision (its answer to the ACTION question) as stored on-chain, with the number of questions it answered in its batch. Agents that did not submit remain listed.">
-        <Table caption="Agent decisions">
-          <thead>
-            <tr>
-              <Th>Agent</Th>
-              <Th>Choice</Th>
-              <Th align="right">Score</Th>
-              <Th align="right">Probability</Th>
-              <Th align="right">Bond (MON)</Th>
-              <Th>Reason hash</Th>
-              <Th align="right">Answers</Th>
-              <Th>Submitted</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.participants.map((agentId) => {
-              const s = finalSubmission(p, agentId);
-              const answers = p.submissions.filter((x) => x.agentId === agentId).length;
-              return (
-                <tr key={agentId}>
-                  <Td className="whitespace-nowrap font-medium">{agentName(agentId)}</Td>
-                  <Td mono>{s?.choice ?? <StatusMark tone="fail">missed</StatusMark>}</Td>
-                  <Td align="right" mono>{s ? s.score : "—"}</Td>
-                  <Td align="right" mono>{s ? formatBps(s.probability) : "—"}</Td>
-                  <Td align="right" mono>{formatMon(s?.bond ?? d.config.lockPerAgent)}</Td>
-                  <Td>{s ? <Hash value={s.reasonHash} /> : "—"}</Td>
-                  <Td align="right" mono>{answers}/{d.config.questionCount}</Td>
-                  <Td mono className="text-ink-2">{s ? formatUtc(s.submittedAt) : "—"}</Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
+      <Section id="decisions" index={n(2)} title="Agent decisions" description={`Each participant's final decision as recorded on-chain, backed by a ${formatMon(d.config.lockPerAgent)} MON bond. Reasons appear when their text verifies against the on-chain hash.`}>
+        <AgentModules agents={v.agents} />
       </Section>
 
-      <Section id="aggregation" index="04" title="Aggregation">
-        {p.aggregation ? (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <SupportBars support={FORKS.map((f) => p.aggregation!.support[f])} total={p.aggregation.total} thresholdBps={d.config.thresholdBps} />
-            <Panel>
-              <KeyValue
-                rows={[
-                  { k: "Leading fork", v: <span className="font-mono">{p.aggregation.leading}</span> },
-                  { k: "Threshold", v: <StatusMark tone={p.aggregation.passed ? "pass" : "fail"}>{p.aggregation.passed ? "passed" : "not met"}</StatusMark> },
-                  { k: "Submissions", v: `${p.aggregation.submissions} (quorum ${d.config.quorum})` },
-                  { k: "Approved action", v: <span className="font-mono">{p.aggregation.approved ?? "awaiting guardian"}</span> },
-                  ...(p.aggregation.guardianDeadline ? [{ k: "Guardian deadline", v: formatUtc(p.aggregation.guardianDeadline) }] : []),
-                ]}
-              />
-            </Panel>
-          </div>
-        ) : (
-          <EmptyState title="Not aggregated yet">
-            Aggregation runs after the submission deadline{d.deadline ? ` (${formatUtc(d.deadline)})` : ""} or once every participant has submitted.
-          </EmptyState>
-        )}
+      <Section id="aggregation" index={n(3)} title="Aggregation & threshold" description="Read from DecisionEngine; the same integer formula runs off-chain and can be reproduced from the submissions.">
+        <div className="max-w-[720px]">
+          <AggregationPanel v={v} />
+        </div>
       </Section>
 
-      <Section id="action" index="05" title="Action">
-        {p.action ? (
-          <Panel>
-            <KeyValue
-              rows={[
-                { k: "Approved fork", v: <span className="font-mono">{p.action.fork} · {p.action.definition.alias}</span> },
-                { k: "Approved by", v: p.action.approvedBy },
-                { k: "Effect", v: p.action.definition.effect },
-                ...(exec
-                  ? [
-                      { k: "Amount moved", v: `${formatMon(exec.amountMoved)} MON` },
-                      { k: "Buckets after", v: `ACTIVE ${formatMon(exec.after.active)} · RESERVE ${formatMon(exec.after.reserve)} MON` },
-                      { k: "Start price", v: `${formatPrice(exec.startPrice.price, exec.startPrice.expo)} USD · published ${formatUtc(exec.startPrice.publishTime)}` },
-                      { k: "Transaction", v: exec.tx ? <Hash value={exec.tx.hash} href={explorer.tx(exec.tx.hash)} /> : <Unavailable reason="log not readable" /> },
-                    ]
-                  : [{ k: "Execution", v: "pending" }]),
-              ]}
-            />
-          </Panel>
-        ) : (
-          <EmptyState title="No action approved yet">Only the fork approved by the engine (or a guardian, on escalation) can execute.</EmptyState>
-        )}
+      <Section id="action" index={n(4)} title="Bounded action">
+        <div className="max-w-[720px]">
+          <ActionPanel v={v} />
+        </div>
       </Section>
 
-      <Section id="outcome" index="06" title="Outcome">
-        {p.outcome ? (
-          <Panel>
-            <KeyValue
-              rows={[
-                { k: "Expected action", v: <span className="font-mono">{p.outcome.expectedAction}</span> },
-                ...(p.outcome.observedResult
-                  ? [
-                      { k: "Observed", v: `${formatPrice(p.outcome.observedResult.start.price, p.outcome.observedResult.start.expo)} → ${formatPrice(p.outcome.observedResult.end.price, p.outcome.observedResult.end.expo)} USD · ${p.outcome.observedResult.moveBps.toString()} bps (band ±${p.outcome.observedResult.bandBps})` },
-                      { k: "Correct fork", v: <span className="font-mono">{p.outcome.observedResult.correctFork}</span> },
-                    ]
-                  : [{ k: "Observed", v: "void — no valid oracle update inside the window" }]),
-                { k: "Success", v: p.outcome.success === null ? "—" : <StatusMark tone={p.outcome.success ? "pass" : "fail"}>{p.outcome.success ? "yes" : "no"}</StatusMark> },
-                {
-                  k: "Verification source",
-                  v: p.outcome.verificationSource.kind === "pyth" ? `Pyth ${p.outcome.verificationSource.contract}, window ${formatUtc(p.outcome.verificationSource.window.from)} + ${p.outcome.verificationSource.window.to - p.outcome.verificationSource.window.from} s` : "preview",
-                },
-                { k: "Resolved", v: formatUtc(p.outcome.timestamp) },
-              ]}
-            />
-          </Panel>
-        ) : (
-          <EmptyState title="Not resolved yet">The outcome is verified from a signed Pyth price published inside the resolution window after the horizon.</EmptyState>
-        )}
+      <Section id="transactions" index={n(5)} title="Transactions" description="Every lifecycle transition, the contract function that caused it (decoded from calldata) and its block.">
+        {v.transitions.length ? <TransitionsTable v={v} /> : <EmptyState title="No transitions readable" />}
       </Section>
 
-      <Section id="settlement" index="07" title="Settlement" aside={p.settlement && <StatusMark tone={p.settlement.settlementStatus === "SETTLED" ? "pass" : "wait"}>{p.settlement.settlementStatus}</StatusMark>}>
-        {p.settlement ? (
-          <Table caption="Settlement">
-            <thead>
-              <tr>
-                <Th>Agent</Th>
-                <Th>Result</Th>
-                <Th align="right">Bond</Th>
-                <Th align="right">Penalty</Th>
-                <Th align="right">Reward</Th>
-                <Th align="right">Net</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {p.settlement.lines.map((l) => (
-                <tr key={l.agentId}>
-                  <Td className="font-medium">{agentName(l.agentId)}</Td>
-                  <Td>{l.result ? <StatusMark tone={l.result === "CORRECT" ? "pass" : l.result === "NEUTRAL" ? "neutral" : "fail"}>{l.result}</StatusMark> : <span className="text-ink-3">{l.settlementStatus.toLowerCase()}</span>}</Td>
-                  <Td align="right" mono>{formatMon(l.bond)}</Td>
-                  <Td align="right" mono>{formatMon(l.penalty)}</Td>
-                  <Td align="right" mono>{formatMon(l.reward)}</Td>
-                  <Td align="right" mono>{l.net < 0n ? `−${formatMon(-l.net)}` : formatMon(l.net)}</Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        ) : (
-          <EmptyState title="No bonds">This decision has no participants.</EmptyState>
-        )}
+      <Section id="outcome" index={n(6)} title="Outcome">
+        <div className="max-w-[720px]">
+          <OutcomePanel v={v} />
+        </div>
+      </Section>
+
+      <Section id="settlement" index={n(7)} title="Settlement" aside={<StatusMark tone={v.settlement.status === "SETTLED" ? "pass" : "wait"}>{v.settlement.status}</StatusMark>}>
+        <SettlementPanel v={v} />
+      </Section>
+
+      <Section
+        id="integrity"
+        index={n(8)}
+        title="Integrity"
+        description={verified.store.available ? `Off-chain payloads (${verified.store.kind}) recomputed and compared with the on-chain commitments.` : `${verified.store.reason}. On-chain values are shown without their payloads.`}
+      >
+        {v.integrity.length ? <IntegrityPanel v={v} /> : <EmptyState title="No checks" />}
       </Section>
 
       <Section
         id="provenance"
-        index="08"
+        index={n(9)}
         title="Provenance"
-        description="Each agent's final decision traced from state to settlement. Links are checked for consistency on every load."
+        description="Each agent's final decision traced from state to settlement. Every link is checked against its neighbours on each load."
         aside={<StatusMark tone={issues.length ? "fail" : "pass"}>{issues.length ? `${issues.length} inconsistencies` : "consistent"}</StatusMark>}
       >
         {issues.length > 0 && (
@@ -255,14 +167,17 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
             ))}
           </ul>
         )}
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-6 2xl:grid-cols-2">
           {d.participants.map((agentId) => (
-            <div key={agentId}>
-              <p className="mb-2 text-[13px] font-semibold">{agentName(agentId)}</p>
+            <div key={agentId} className="min-w-0">
+              <p className="mb-2 text-[13px] font-semibold">{v.agents.find((a) => a.agentId === agentId)?.name ?? `Agent ${agentId}`}</p>
               <ProvenanceTrail steps={traceDecision(p, agentId)} />
             </div>
           ))}
         </div>
+        <p className="mt-6 text-[12px] text-ink-3">
+          State hash <Hash value={d.stateHash} /> · questions hash <Hash value={d.questionsHash} />
+        </p>
       </Section>
     </>
   );

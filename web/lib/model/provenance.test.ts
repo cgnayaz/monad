@@ -93,7 +93,7 @@ function fixture(): DecisionProvenance {
     decisionId,
     expectedAction: action.fork,
     observed: observe(action.execution.startPrice, { price: 9_980n, expo: -8, publishTime: NOW + 210 }, 10),
-    source: { kind: "preview" },
+    source: { kind: "simulation" },
     timestamp: NOW + 220,
     tx: TX(6),
   });

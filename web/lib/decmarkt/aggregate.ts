@@ -76,7 +76,7 @@ export function aggregate(decisionId: DecisionId, subs: readonly AggregationSubm
 
   return {
     decisionId,
-    source: "preview",
+    source: "simulation",
     inputs,
     support,
     total,

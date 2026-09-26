@@ -1,48 +1,74 @@
 # Demo Flow
 
-Target: 3 minutes on stage, fully live on Monad Testnet. Every value shown is real.
+The judge-facing demo is `/demo`: one round of the real system, told as eleven steps on
+one page. Target: about two minutes of narration plus the 60 s horizon.
 
-## 0. Before judges arrive (checklist)
+## Modes
 
-- [ ] Contracts deployed, roles wired, parameters set (DEPLOYMENT.md).
-- [ ] 5 agents registered and bonded; reward pool funded; vault funded.
-- [ ] Proposer, agent and keeper keys have gas.
-- [ ] At least one **fully resolved** decision exists from earlier today (real, on-chain)
-      — used to show settlement if the live round's horizon has not elapsed yet.
-- [ ] `/demo` loads, network indicator shows current block, AI provider health = ok.
-- [ ] Guardian wallet connected in a second tab (for an ESCALATE case).
-- [ ] Backup: screen recording of a full real round (clearly labelled "recording").
-
-## 1. Script
-
-| Time | Screen | Action | Say |
-|---|---|---|---|
-| 0:00 | `/` | — | "AI agents make decisions nobody is accountable for. DecMarkt makes every AI decision bonded, bounded and settled on Monad." |
-| 0:15 | `/demo` | **Start round** | "The server snapshots real state: Pyth MON/USD, Monad network data, vault balances. It is hashed and committed on-chain before any agent runs." → CREATED + OPEN tx links appear |
-| 0:35 | State + Questions | scroll | "These are the exact inputs and the six explicit questions. Nothing is hidden in a prompt." |
-| 0:50 | Decision matrix | agents land one by one | "Five independent analysts, each with its own operator address and bond. Each gives a choice from four bounded forks, a deterministic score, a probability, and a reason. Each is its own transaction." |
-| 1:20 | Support bars + verdict | **Aggregate** | "Aggregation is not an LLM. It's integer math in DecisionEngine: probability × track record. 60% threshold, quorum 4, minimum score for action." → AGGREGATED + APPROVED |
-| 1:45 | Action record | **Execute** | "Only the approved fork can run. The vault moves MON between buckets — no external calls, no AI calldata. Start price is verified from Pyth on-chain." → EXECUTED |
-| 2:05 | `/decisions/[earlier id]` | open | "The horizon is 3 minutes, so here's this morning's round. The end price is a signed Pyth update inside a strict time window. Correct fork: DERISK." |
-| 2:25 | Settlement table | — | "Correct agents get their bond back plus rewards, weighted by probability. Wrong agents are slashed in proportion to their confidence. The agents had no say in this." |
-| 2:40 | Integrity panel | — | "Every off-chain payload is re-hashed in your browser against the chain. Green means it matches." |
-| 2:50 | `/agents` | — | "Over time, accuracy on-chain becomes voting weight. That's accountability. Built on Monad." |
-
-Return to the live round at the end if its horizon has elapsed → **Resolve** live.
-
-## 2. Failure handling on stage
-
-| Failure | What the UI shows | What to do |
+| | Simulation mode | Live testnet mode |
 |---|---|---|
-| AI provider slow/failing | agent row: `unavailable — provider timeout` | continue; quorum 4 of 5 tolerates one |
-| Quorum not met | CANCELLED with reason | say "fail-safe", open the resolved earlier decision |
-| RPC hiccup | pending line + retry | the step endpoint is idempotent; press again |
-| Threshold not met | APPROVED → NO_ACTION with verdict | explain fail-safe: disagreement never moves funds |
-| ESCALATE wins | guardian panel | sign guardian choice from second tab |
-| Everything down | recording | say it is a recording |
+| Needs | `ANTHROPIC_API_KEY` (+ `PYTH_API_KEY` for verify) | the above + deployed contracts + proposer, keeper and 5 agent keys |
+| State, questions, agents, aggregation | real, identical | real, identical; state hash committed on-chain **before** agents run |
+| Action | applied to a local model of the vault; no funds, no transaction | `ExecutionVault.execute` approved in the judge's wallet (or by the keeper) |
+| Monad step | explicitly shows "no transactions" | every transaction with pending → confirmed state and explorer links |
+| Verify | real Pyth price observed after the horizon; labelled not on-chain | `OutcomeRegistry.resolve` with a signed price inside the window |
+| Settlement | contract formula on notional bonds; labelled | read from chain after the resolve transaction |
 
-## 3. What judges can do themselves
+A striped **SIMULATION** banner or an accent **LIVE · MONAD TESTNET** banner is always
+visible once a round starts. Simulation never shows a transaction hash, block or balance.
 
-- Open any tx on the Monad explorer from any step.
-- Click any hash to see the recomputed value.
-- Read `/contracts` for addresses and roles; `/how-it-works` for the protocol.
+Demo time scale: 90 s submission window, 60 s horizon (`DEMO_PARAMETERS`). Same rules.
+
+## The eleven steps
+
+| # | Step | What the judge sees | Source |
+|---|---|---|---|
+| 1 | State | state id, hash, sources, inputs (available / unavailable with reason) | collectors |
+| 2 | Questions | six questions with their own ids and the inputs they evaluate | `buildQuestionSet` |
+| 3 | Parallel decisions | five lanes on one time axis; all start together; failures labelled | pipeline stream |
+| 4 | Choice · Score · Probability · Reason | per agent, with bond (live) | agent runs |
+| 5 | Batch / question results | question × agent matrix; the Q0 row feeds aggregation | agent batches |
+| 6 | Bounded forks | NO_ACTION · ACTION_A (DERISK) · ACTION_B (DEPLOY) · ESCALATE, allowed flags, vote counts | `ACTION_SPACE` |
+| 7 | Aggregation | aggregate score, aggregate probability, selected choice, threshold + gates | deterministic rules / DecisionEngine |
+| 8 | Action | the approved predefined action, or NO_ACTION as fail-safe | `resolveAction` / engine |
+| 9 | Monad | createDecision, openDecision, 5 × submitBatch, aggregate, execute (wallet) | chain |
+| 10 | Verify | countdown to the horizon, then expected vs observed, price move vs band | Pyth / OutcomeRegistry |
+| 11 | Settlement | agent, prediction, result, bond, reward, penalty, net | contract formula / chain |
+
+## Script (live mode)
+
+| Time | Step | Say |
+|---|---|---|
+| 0:00 | header | "Jev structures the decision; DecMarkt makes it accountable; Monad enforces it." |
+| 0:10 | 1–2 | "This is the real state right now, hashed. These are the questions it generates. The hash is on-chain before any agent runs." |
+| 0:25 | 3–4 | "Five analysts start at once. Each returns a choice from a closed set, a score computed from its rubric, a probability and a reason. Here one failed — it is shown, not hidden." |
+| 0:50 | 5–6 | "Every question-level answer is its own record; only the action question is aggregated. This is the whole action space." |
+| 1:05 | 7–8 | "No model picks the result. Probability times track record, sixty percent threshold, minimum score. Passed — so the vault may run exactly this branch." |
+| 1:20 | 9 | "I approve the execution in my wallet. The contract decides what runs; my wallet only pays the oracle fee." |
+| 1:30 | 10 | "After the horizon the signed Pyth price decides which action was correct." |
+| 2:30 | 11 | "Bonds settle by fixed rules: right agents earn, wrong ones lose in proportion to their confidence, the missing one pays a penalty." |
+
+Then open the decision's audit record (link in the round summary).
+
+## Failure handling
+
+Any failing step stops the lifecycle: the step is marked failed with the actual error,
+later steps are marked stopped, and **Retry** re-runs from the right place (execution and
+verification retry in place; earlier failures restart the round). No success is shown for
+a step that did not complete.
+
+| Failure | What happens |
+|---|---|
+| AI key / oracle key / contracts missing | the mode is unavailable, with the reason, before starting |
+| An agent times out or returns invalid output | labelled on its lane; counted as missed; the round continues |
+| Quorum not met | live: aggregation after the deadline cancels the decision (bonds returned) — shown as failed with the reason |
+| Wallet rejects the transaction | step 9 fails with the wallet's message; retry or use the keeper |
+| Oracle unavailable at verify | step 10 fails with the error; retry |
+| Rate limit | "retry in N s" |
+
+## Before presenting
+
+- [ ] Keys configured on the deployment; `/demo` shows both modes available.
+- [ ] Judge wallet on Monad Testnet with a little MON for gas + Pyth fee.
+- [ ] One full live round run earlier (it appears on the dashboard and in `/decisions`).
+- [ ] Backup: a recording of a full live round, labelled as a recording.

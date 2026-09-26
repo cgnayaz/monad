@@ -15,11 +15,11 @@ import type { TxRef } from "./transaction";
  *
  * mode "live":    state and questions were committed on-chain before any agent ran, and
  *                 the bounded action was handed to the DecMarkt execution layer.
- * mode "preview": the same pipeline on real state with real agents, but nothing was written
+ * mode "simulation": the same pipeline on real state with real agents, but nothing was written
  *                 on-chain (decisionId "0", which is never a valid on-chain id).
  */
 
-export const PREVIEW_DECISION_ID = "0";
+export const SIMULATION_DECISION_ID = "0";
 
 export interface DecisionParameters {
   submissionWindow: number;
@@ -62,7 +62,7 @@ export type ExecutionHandoff =
 
 export interface FinalDecision {
   version: "decmarkt.final-decision/1";
-  mode: "live" | "preview";
+  mode: "live" | "simulation";
   decisionId: DecisionId;
   createdAt: UnixSeconds;
   parameters: DecisionParameters;
@@ -82,6 +82,8 @@ export interface FinalDecision {
   action: Action | null;
   execution: ExecutionHandoff;
   reputationSource: "chain" | "none-recorded";
+  /** Whether state, questions and runs were written to the payload store (live mode). */
+  payloads: { stored: boolean; detail: string };
 }
 
 // ─── Streaming events (NDJSON over /api/decisions) ─────────────────────────

@@ -9,7 +9,7 @@ import type { Action } from "@/lib/model/action";
 import type { Aggregation } from "@/lib/model/aggregation";
 import type { AgentRun } from "@/lib/model/decision";
 import {
-  PREVIEW_DECISION_ID,
+  SIMULATION_DECISION_ID,
   type AgentOutcome,
   type DecisionParameters,
   type ExecutionHandoff,
@@ -22,7 +22,7 @@ import type { DecisionId, UnixSeconds } from "@/lib/model/primitives";
 import type { StateRecord } from "@/lib/model/state";
 import type { TxRef } from "@/lib/model/transaction";
 import { FORKS, type Status } from "@/lib/types/protocol";
-import type { ExecutionLayer, ReputationRecords } from "./ports";
+import type { ExecutionLayer, PayloadSink, ReputationRecords } from "./ports";
 
 /**
  * The Jev decision pipeline (JEV_INTEGRATION.md §12).
@@ -31,7 +31,7 @@ import type { ExecutionLayer, ReputationRecords } from "./ports";
  *         → [SUBMIT] → AGGREGATION → BOUNDED ACTION → [EXECUTION] → (VERIFY later)
  *
  * Bracketed stages run only when an execution layer is available ("live"); otherwise the
- * pipeline runs in "preview" mode on the same real state with the same real agents and
+ * pipeline runs in "simulation" mode on the same real state with the same real agents and
  * writes nothing on-chain. At no point does a model choose the final decision: aggregation,
  * threshold and action are the deterministic functions in lib/decmarkt and lib/jev.
  */
@@ -42,11 +42,18 @@ export interface PipelineDeps {
   agents: readonly AgentSpec[];
   params: DecisionParameters;
   reputation: ReputationRecords;
-  /** null → preview mode; `previewReason` says why. */
+  /** null → simulation mode; `simulationReason` says why. */
   execution: ExecutionLayer | null;
-  previewReason?: string;
+  simulationReason?: string;
   agentTimeoutMs?: number;
   now?: () => UnixSeconds;
+  /** Where live payloads (state, questions, runs with reasons) are published. */
+  payloads?: PayloadSink | null;
+  /**
+   * "server": the keeper executes the approved action immediately.
+   * "defer": stop at APPROVED so the action can be executed by a wallet the user approves.
+   */
+  executionPolicy?: "server" | "defer";
 }
 
 export type Emit = (e: PipelineEvent) => void;
@@ -72,7 +79,7 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
   stage("QUESTIONS", "done", `${questions.questions.length} questions`);
 
   // COMMIT (live): hashes on-chain before any agent runs ────────────────
-  let decisionId: DecisionId = PREVIEW_DECISION_ID;
+  let decisionId: DecisionId = SIMULATION_DECISION_ID;
   let participants: number[] = deps.agents.map((a) => a.agentId);
   let deadline: UnixSeconds | null = null;
   const txs: TxRef[] = [];
@@ -90,7 +97,21 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
       throw new Error(`Commit failed: ${errMessage(err)}`);
     }
   } else {
-    stage("COMMIT", "skipped", deps.previewReason ?? "preview mode");
+    stage("COMMIT", "skipped", deps.simulationReason ?? "simulation mode");
+  }
+
+  // Publish the committed state and questions so anyone can verify them against the hashes.
+  const payloadErrors: string[] = [];
+  const publish = async (what: string, fn: () => Promise<void>) => {
+    try {
+      await fn();
+    } catch (err) {
+      payloadErrors.push(`${what}: ${errMessage(err)}`);
+    }
+  };
+  if (exec && deps.payloads) {
+    await publish("state", () => deps.payloads!.putState(state));
+    await publish("questions", () => deps.payloads!.putQuestions(questions));
   }
 
   // PARALLEL DECISIONS ─────────────────────────────────────────────────
@@ -106,6 +127,7 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
     onRun: (run) => emit({ type: "agent", run }),
   });
   const runs = Object.values(parallel.runs);
+  if (exec && deps.payloads) await Promise.all(runs.map((r) => publish(`run ${r.agentId}`, () => deps.payloads!.putRun(r))));
   const okRuns = runs.filter((r): r is AgentRun & { final: NonNullable<AgentRun["final"]> } => r.status === "ok" && r.final !== null);
   stage("PARALLEL_DECISIONS", okRuns.length === runs.length ? "done" : "failed", `${okRuns.length}/${runs.length} agents produced a valid decision`);
 
@@ -132,7 +154,7 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
     counted = results.filter((r): r is (typeof okRuns)[number] => r !== null);
     stage("SUBMIT", submissionErrors.length ? "failed" : "done", `${counted.length} batches on-chain`);
   } else {
-    stage("SUBMIT", "skipped", "preview mode");
+    stage("SUBMIT", "skipped", "simulation mode");
   }
 
   // AGGREGATION: deterministic, never delegated to a model ─────────────
@@ -159,12 +181,25 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
   // EXECUTION LAYER HANDOFF ────────────────────────────────────────────
   let execution: ExecutionHandoff;
   if (!exec) {
-    execution = { status: "not-submitted", reason: deps.previewReason ?? "preview mode" };
+    execution = { status: "not-submitted", reason: deps.simulationReason ?? "simulation mode" };
     stage("EXECUTION", "skipped", execution.reason);
   } else {
     stage("EXECUTION", "running");
-    execution = await handOff(exec, { decisionId, participants, counted: counted.length, deadline, aggregation, action, txs, submissionErrors, horizon: p.horizon, now });
-    stage("EXECUTION", execution.status === "submitted" && execution.next?.step !== "execute" ? "done" : "failed", describe(execution));
+    execution = await handOff(exec, {
+      decisionId,
+      participants,
+      counted: counted.length,
+      deadline,
+      aggregation,
+      action,
+      txs,
+      submissionErrors,
+      horizon: p.horizon,
+      now,
+      defer: deps.executionPolicy === "defer",
+    });
+    const awaiting = execution.status === "submitted" && execution.next?.step === "execute" && deps.executionPolicy === "defer" && execution.aggregationMatchesChain;
+    stage("EXECUTION", awaiting ? "done" : execution.status === "submitted" && execution.next?.step !== "execute" ? "done" : "failed", describe(execution));
   }
 
   const agents: AgentOutcome[] = runs.map((r) =>
@@ -175,7 +210,7 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
 
   const decision: FinalDecision = {
     version: "decmarkt.final-decision/1",
-    mode: exec ? "live" : "preview",
+    mode: exec ? "live" : "simulation",
     decisionId,
     createdAt: now(),
     parameters: p,
@@ -200,6 +235,13 @@ export async function runDecisionPipeline(deps: PipelineDeps, emit: Emit = () =>
     action,
     execution,
     reputationSource: deps.reputation.source,
+    payloads: !exec
+      ? { stored: false, detail: "simulation: nothing is published" }
+      : !deps.payloads
+        ? { stored: false, detail: "payload store not configured; only hashes are on-chain" }
+        : payloadErrors.length
+          ? { stored: false, detail: payloadErrors.join("; ") }
+          : { stored: true, detail: "state, questions and agent runs published" },
   };
   emit({ type: "result", decision });
   return decision;
@@ -218,6 +260,7 @@ async function handOff(
     submissionErrors: { agentId: number; message: string }[];
     horizon: number;
     now: () => UnixSeconds;
+    defer: boolean;
   },
 ): Promise<ExecutionHandoff> {
   const base = { status: "submitted" as const, decisionId: ctx.decisionId, transactions: ctx.txs, submissionErrors: ctx.submissionErrors };
@@ -261,6 +304,10 @@ async function handOff(
   if (!matches) {
     // Never execute on a disagreement between the local rules and the contract.
     return { ...base, onChainStatus: status, aggregationMatchesChain: false, next: { step: "investigate", availableAt: null, reason: "local aggregation differs from DecisionEngine; execution withheld" } };
+  }
+
+  if (ctx.defer) {
+    return { ...base, onChainStatus: status, aggregationMatchesChain: true, next: { step: "execute", availableAt: null, reason: `${ctx.action.fork} approved; awaiting execution approval` } };
   }
 
   try {

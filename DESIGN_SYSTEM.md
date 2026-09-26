@@ -64,9 +64,16 @@ Theme via CSS variables on `:root` and `[data-theme="dark"]`, defaulting to syst
 
 ## 5. Motion
 
-Only state change: 120 ms opacity/colour for status updates; lifecycle rail step fills
-when its tx confirms. No looping animation except a 1 px progress line during pending tx.
-Respects `prefers-reduced-motion`.
+Only for state changes (`app/globals.css`), all disabled under `prefers-reduced-motion`:
+
+| Class | Meaning | Where |
+|---|---|---|
+| `dm-progress` | 1 px indeterminate line under something being processed | agent evaluating, running pipeline step, active Jev stage |
+| `dm-pending` | slow blink of a status square | transaction pending, step in flight |
+| `dm-arrive` | 180 ms settle-in of new data, once | agent result, confirmed transaction, stage content |
+| width transitions | bars grow to their measured value | support bars, horizon countdown |
+
+No decorative or looping animation otherwise.
 
 ## 6. Primitives (`web/components/ui/`, shadcn-style, restyled)
 
@@ -98,8 +105,9 @@ appears where there is no data yet; an empty state explains what will fill it.
 
 - **`/`** — header strip (network, block height, contract status), latest decision summary
   (status rail + verdict + outcome), vault buckets, agent standings table.
-- **`/demo`** — left column: step list with live status and tx links; right: the current
-  stage's detail component. One primary button that advances only when the chain allows.
+- **`/demo`** — mode selector (simulation / live testnet), a persistent mode banner, then
+  one numbered timeline of eleven steps whose content appears as each step completes;
+  a sticky round summary on wide screens. See DEMO_FLOW.md.
 - **`/decisions/[id]`** — anchored sections in lifecycle order: State → Questions →
   Decisions → Aggregation → Action → Outcome → Settlement → Integrity.
 - **`/how-it-works`** — the pipeline as a typeset vertical sequence with one sentence and

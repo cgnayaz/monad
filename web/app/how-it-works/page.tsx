@@ -8,26 +8,53 @@ import { Table, Td, Th } from "@/components/ui/table";
 
 export const metadata: Metadata = { title: "How it works" };
 
+const LAYERS = [
+  {
+    n: "1",
+    name: "Jev",
+    role: "structures the decision",
+    does: "Turns the world into a hashed state, asks explicit questions about it, and has five independent analysts answer each question with a choice from a closed set, rubric ratings that produce a score, a probability and a reason.",
+    produces: "State · Questions · Choice · Score · Probability",
+    code: "web/lib/jev",
+  },
+  {
+    n: "2",
+    name: "DecMarkt",
+    role: "adds accountability",
+    does: "Gives every analyst an on-chain identity and a bond, aggregates their decisions with fixed integer rules, applies the threshold, selects one bounded action, and settles every bond against the verified outcome.",
+    produces: "Aggregate · Threshold · Action · Reward / penalty",
+    code: "web/lib/decmarkt, DecisionEngine, OutcomeRegistry",
+  },
+  {
+    n: "3",
+    name: "Monad",
+    role: "enforces and records the result",
+    does: "Holds the lifecycle, the submissions, the bonds and the treasury in contracts. Only the approved action can execute; the outcome is taken from a signed Pyth price inside a strict window; every step is a public transaction.",
+    produces: "Transactions · Execution · Verified outcome · Settlement",
+    code: "contracts/src",
+  },
+];
+
 const JEV_MAP: [string, string, string][] = [
   ["State", "Canonical JSON of sourced inputs, hashed and committed before agents run", "Decision.stateHash"],
-  ["Questions", "Six explicit questions with weighted rubrics, rendered verbatim", "Decision.questionsHash"],
-  ["Choice", "One of four bounded forks, mapped through a closed table", "Submission.choice"],
-  ["Score", "Computed from 0–4 factor ratings by a fixed formula; never output by the model", "Submission.score"],
+  ["Questions", "Six explicit questions, each with its own id and the inputs it evaluates", "Decision.questionSetHash"],
+  ["Choice", "One of four bounded forks, validated as a closed enum", "Submission.choice"],
+  ["Score", "Computed from 0–4 rubric ratings by a fixed formula (0–10000)", "Submission.score"],
   ["Probability", "Confidence in basis points (1–99 %); weights the vote and the settlement", "Submission.probability"],
-  ["Parallel decisions", "Five isolated runs, each submitted from its own operator address", "5 × submitBatch"],
-  ["Batch decisions", "Each agent submits all its answers in one transaction; one on-chain record per question", "submitBatch"],
-  ["Bounded forks", "Fixed enum plus per-decision mask; one code path per fork in the vault", "Decision.allowedForks"],
-  ["Action", "Only the fork approved by the engine executes", "ExecutionVault.execute"],
-  ["Verify", "Signed oracle price inside a strict window; hashes recomputed in the browser", "OutcomeRegistry.resolve"],
+  ["Parallel decisions", "Five isolated runs, each from its own operator address", "5 × submitBatch"],
+  ["Batch decisions", "All answers of an agent in one transaction, one record per question", "Submission per (agent, question)"],
+  ["Bounded forks", "Fixed enum plus a per-decision mask; one code path per fork in the vault", "DecisionConfig.allowedForks"],
+  ["Action", "Only the fork approved by the engine (or a guardian) executes", "ExecutionVault.execute"],
+  ["Verify", "Signed oracle price inside a strict window; hashes recomputed on read", "OutcomeRegistry.resolve"],
 ];
 
 const GUARANTEES = [
-  ["The AI cannot choose an arbitrary action.", "Choices are validated against a closed enum and the per-decision fork mask."],
-  ["The AI cannot produce calldata or sign.", "Keys stay on the server; every transaction's target and ABI are fixed in code."],
-  ["The AI does not decide the outcome.", "Aggregation and threshold are integer math in DecisionEngine."],
-  ["The AI does not settle itself.", "Rewards and penalties follow from the oracle outcome by fixed rules."],
-  ["Disagreement never moves funds.", "Any failed gate approves NO_ACTION."],
-  ["Nothing shown is simulated.", "Chain values come from the chain; missing data is marked unavailable."],
+  ["No arbitrary action", "Choices are validated against a closed enum and the decision's fork mask, in the server and in the contract."],
+  ["No keys or calldata for the AI", "Keys stay in the execution layer; every call targets a fixed function with arguments built from validated fields."],
+  ["No model decides the outcome", "Aggregation and threshold are integer rules; the contract's result is compared with the local one before anything executes."],
+  ["No self-settlement", "Rewards and penalties follow from the oracle outcome by fixed rules in OutcomeRegistry."],
+  ["Disagreement never moves funds", "Any failed gate — quorum, share or score — approves NO_ACTION."],
+  ["Failures are visible", "Timeouts, provider errors, invalid JSON and schema violations are recorded per agent and settled as missed."],
 ];
 
 export default function HowItWorksPage() {
@@ -36,26 +63,57 @@ export default function HowItWorksPage() {
       <PageHeader
         eyebrow="Protocol"
         title="How DecMarkt works"
-        lead="Jev structures decisions. DecMarkt makes them accountable. Monad makes the result enforceable and auditable."
+        lead="Jev structures the decision. DecMarkt adds accountability. Monad enforces and records the result."
       />
 
-      <Section index="01" title="The pipeline" description="From real-world state to settled bonds. Each stage names the layer and component responsible for it.">
+      <Section title="Three layers">
+        <ol className="border border-rule bg-surface">
+          {LAYERS.map((l) => (
+            <li key={l.name} className="grid grid-cols-1 gap-x-8 gap-y-2 border-b border-rule px-5 py-5 last:border-b-0 md:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_280px]">
+              <div>
+                <p className="font-mono text-[11px] text-ink-3">layer {l.n}</p>
+                <p className="text-[17px] font-medium">{l.name}</p>
+                <p className="text-[13px] text-accent">{l.role}</p>
+              </div>
+              <p className="text-[13.5px] leading-[21px] text-ink-2">{l.does}</p>
+              <dl className="space-y-2 text-[12.5px] md:col-start-2 xl:col-start-auto">
+                <div>
+                  <dt className="label">Produces</dt>
+                  <dd className="mt-0.5">{l.produces}</dd>
+                </div>
+                <div>
+                  <dt className="label">Where</dt>
+                  <dd className="mt-0.5 font-mono text-[12px] text-ink-2">{l.code}</dd>
+                </div>
+              </dl>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      <Section title="From state to settlement" description="Every stage names the layer and the component responsible. The dashboard and the decision records show these stages with real values.">
         <Pipeline />
       </Section>
 
       <Section
-        index="02"
         title="What is being decided"
-        description="An on-chain vault holds test MON in two buckets, ACTIVE and RESERVE. For each round, agents decide whether to move part of it between the buckets over the next horizon. The correct answer is defined by the MON/USD price move measured from signed Pyth prices, so it is never a matter of opinion."
+        description="An on-chain vault holds test MON in two buckets, ACTIVE and RESERVE. Each round decides whether to move part of it for the next horizon. The correct answer is defined by the MON/USD move measured from signed Pyth prices — never by opinion."
       >
         <ForkTable />
       </Section>
 
-      <Section index="03" title="Lifecycle" description="Enforced in DecisionRegistry. Invalid transitions revert; each reached state records its block.">
+      <Section title="Lifecycle" description="Enforced by DecisionRegistry. Invalid transitions revert; each reached state records its block and transaction.">
         <LifecycleRail />
       </Section>
 
-      <Section index="04" title="Jev concepts in the implementation">
+      <Section
+        title="Jev in the implementation"
+        aside={
+          <Link href="/docs/jev-integration" className="text-[13px] text-ink-2 hover:text-ink">
+            Full mapping →
+          </Link>
+        }
+      >
         <Table caption="Jev mapping">
           <thead>
             <tr>
@@ -68,27 +126,20 @@ export default function HowItWorksPage() {
             {JEV_MAP.map(([c, impl, anchor]) => (
               <tr key={c}>
                 <Td className="whitespace-nowrap font-medium">{c}</Td>
-                <Td className="min-w-[320px] text-ink-2">{impl}</Td>
+                <Td className="min-w-[300px] text-ink-2">{impl}</Td>
                 <Td mono className="whitespace-nowrap">{anchor}</Td>
               </tr>
             ))}
           </tbody>
         </Table>
-        <p className="mt-3 text-[13px] text-ink-2">
-          Full mapping in{" "}
-          <Link href="/docs/jev-integration" className="text-ink underline decoration-rule underline-offset-2 hover:decoration-ink">
-            Jev integration
-          </Link>
-          .
-        </p>
       </Section>
 
-      <Section index="05" title="Guarantees">
-        <dl className="grid border border-rule bg-surface md:grid-cols-2">
+      <Section title="Guarantees">
+        <dl className="grid grid-cols-1 border border-rule bg-surface md:grid-cols-2">
           {GUARANTEES.map(([g, why], i) => (
-            <div key={g} className={`border-rule px-5 py-4 ${i % 2 === 0 ? "md:border-r" : ""} ${i >= 2 ? "border-t" : i === 1 ? "border-t md:border-t-0" : ""}`}>
+            <div key={g} className={`border-rule px-5 py-4 ${i % 2 === 0 ? "md:border-r" : ""} ${i > 0 ? "border-t" : ""} ${i === 1 ? "md:border-t-0" : ""}`}>
               <dt className="font-medium">{g}</dt>
-              <dd className="mt-1 text-ink-2">{why}</dd>
+              <dd className="mt-1 text-[13px] text-ink-2">{why}</dd>
             </div>
           ))}
         </dl>

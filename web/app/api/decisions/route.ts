@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { acquireRun } from "@/lib/engine/guard";
 import { runDecisionPipeline } from "@/lib/engine/pipeline";
 import { pipelineSetup } from "@/lib/engine/runtime";
@@ -7,13 +8,18 @@ import type { PipelineEvent } from "@/lib/model/final-decision";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+const Body = z.object({ mode: z.enum(["simulation", "live"]) }).strict();
+
 /**
  * POST /api/decisions — run one Jev decision round and stream its events as NDJSON.
- * The request body is ignored: the browser cannot supply state, forks, thresholds, amounts,
- * addresses or calldata. Everything comes from the server's collectors and fixed rules.
+ * The only input is the mode. The browser cannot supply state, forks, thresholds, amounts,
+ * addresses or calldata; everything comes from the server's collectors and fixed rules.
  */
-export async function POST() {
-  const setup = await pipelineSetup();
+export async function POST(req: Request) {
+  const body = Body.safeParse(await req.json().catch(() => null));
+  if (!body.success) return Response.json({ error: 'Body must be {"mode":"simulation"|"live"}' }, { status: 400 });
+
+  const setup = await pipelineSetup(body.data.mode);
   if (!setup.ok) return Response.json({ error: setup.reason }, { status: 503 });
 
   const lock = acquireRun();

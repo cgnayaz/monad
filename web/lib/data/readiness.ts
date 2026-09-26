@@ -14,8 +14,12 @@ export interface Readiness {
   signers: { ok: boolean; detail: string };
   ready: boolean;
   /** What a round can do right now. */
-  mode: "live" | "preview" | "unavailable";
+  mode: "live" | "simulation" | "unavailable";
   modeDetail: string;
+  modes: {
+    simulation: { ok: boolean; reason: string };
+    live: { ok: boolean; reason: string };
+  };
 }
 
 export function readiness(): Readiness {
@@ -39,14 +43,17 @@ export function readiness(): Readiness {
       : { ok: false, detail: `${agentKeys}/5 agent operators, proposer ${env.PROPOSER_PRIVATE_KEY ? "set" : "missing"}, keeper ${env.KEEPER_PRIVATE_KEY ? "set" : "missing"}` },
   };
   const ready = r.contracts.ok && r.ai.ok && r.oracle.ok && r.signers.ok;
-  const mode = !r.ai.ok ? "unavailable" : r.contracts.ok && r.signers.ok ? "live" : "preview";
-  const modeDetail =
-    mode === "unavailable"
-      ? "No AI provider is configured, so no agent can evaluate. Nothing is simulated."
-      : mode === "preview"
-        ? "Preview: real state and real agents; nothing is written on-chain until contracts and signers are configured."
-        : r.oracle.ok
-          ? "Live: every stage is a Monad Testnet transaction."
-          : "Live up to approval; execution needs PYTH_API_KEY for a signed price.";
-  return { ...r, ready, mode, modeDetail };
+  const simulation = r.ai.ok
+    ? { ok: true, reason: r.oracle.ok ? "Real state and real agents; execution, verification and settlement computed locally. No transactions." : "Runs up to the action; verification needs PYTH_API_KEY." }
+    : { ok: false, reason: r.ai.detail };
+  const live = !r.ai.ok
+    ? { ok: false, reason: r.ai.detail }
+    : !r.contracts.ok
+      ? { ok: false, reason: r.contracts.detail }
+      : !r.signers.ok
+        ? { ok: false, reason: r.signers.detail }
+        : { ok: true, reason: r.oracle.ok ? "Every stage is a Monad Testnet transaction." : "Runs to approval; execution needs PYTH_API_KEY for a signed price." };
+  const mode = live.ok ? "live" : simulation.ok ? "simulation" : "unavailable";
+  const modeDetail = mode === "live" ? live.reason : mode === "simulation" ? simulation.reason : "No AI provider is configured, so no agent can evaluate. Nothing is simulated.";
+  return { ...r, ready, mode, modeDetail, modes: { simulation, live } };
 }

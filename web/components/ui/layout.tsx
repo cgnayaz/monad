@@ -54,8 +54,8 @@ export function KeyValue({ rows }: { rows: { k: ReactNode; v: ReactNode }[] }) {
   return (
     <dl className="divide-y divide-rule">
       {rows.map((r, i) => (
-        <div key={i} className="grid grid-cols-[minmax(120px,40%)_1fr] gap-4 px-4 py-2.5">
-          <dt className="label self-center">{r.k}</dt>
+        <div key={i} className="grid grid-cols-1 gap-x-4 gap-y-0.5 px-4 py-2.5 sm:grid-cols-[minmax(120px,40%)_1fr]">
+          <dt className="label sm:self-center">{r.k}</dt>
           <dd className="min-w-0 break-words">{r.v}</dd>
         </div>
       ))}

@@ -146,3 +146,24 @@ export function priceUpdateAt(timestamp: number): Promise<PriceUpdate> {
   return fetchUpdate(`/v2/updates/price/${timestamp}`);
 }
 
+export interface ParsedPrice {
+  price: string; // integer, scaled by 10^expo
+  conf: string;
+  expo: number;
+  publishTime: number;
+}
+
+function parsed(s: PythSnapshot): ParsedPrice {
+  return { price: s.price.price, conf: s.price.conf, expo: s.price.expo, publishTime: s.price.publish_time };
+}
+
+/** Latest MON/USD price as published by Pyth (signed update, parsed). */
+export async function latestPrice(): Promise<ParsedPrice> {
+  return parsed(await fetchPrice("/v2/updates/price/latest"));
+}
+
+/** MON/USD price published at `timestamp` (Pyth's update for that second). */
+export async function priceAt(timestamp: number): Promise<ParsedPrice> {
+  return parsed(await fetchPrice(`/v2/updates/price/${timestamp}`));
+}
+

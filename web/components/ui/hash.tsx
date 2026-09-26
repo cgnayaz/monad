@@ -6,7 +6,15 @@ import { shortHex } from "@/lib/format";
 /** Hash / address display: 6+4 with full value on hover, click to copy, optional explorer link. */
 export function Hash({ value, href, full = false }: { value: string; href?: string; full?: boolean }) {
   const [copied, setCopied] = useState(false);
-  const text = full ? value : shortHex(value);
+  // Full values only where there is room; the complete value is always in the title and copy.
+  const text = full ? (
+    <>
+      <span className="hidden md:inline">{value}</span>
+      <span className="md:hidden">{shortHex(value, 10, 8)}</span>
+    </>
+  ) : (
+    shortHex(value)
+  );
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(value);

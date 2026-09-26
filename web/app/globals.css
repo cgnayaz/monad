@@ -128,6 +128,29 @@ body {
 .prose-doc th, .prose-doc td { border: 1px solid var(--rule); padding: 6px 10px; vertical-align: top; }
 .prose-doc hr { border: 0; border-top: 1px solid var(--rule); margin: 24px 0; }
 
+/* Motion: only for state changes (DESIGN_SYSTEM.md §5). */
+@keyframes dm-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+@keyframes dm-arrive {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dm-blink {
+  50% { opacity: 0.35; }
+}
+/* 1 px indeterminate line under something that is being processed. */
+.dm-progress { position: relative; overflow: hidden; }
+.dm-progress::after {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 1px; width: 40%;
+  background: var(--accent); animation: dm-progress 1.4s cubic-bezier(.4, 0, .2, 1) infinite;
+}
+/* New data (agent result, confirmed transaction, verified outcome) settles in once. */
+.dm-arrive { animation: dm-arrive 180ms ease-out both; }
+/* A pending marker (square) blinks slowly while a transaction or step is in flight. */
+.dm-pending { animation: dm-blink 1.2s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }

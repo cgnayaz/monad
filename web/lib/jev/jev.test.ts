@@ -157,9 +157,9 @@ describe("Verify", () => {
     expect(correctFork(10_000n, 9_980n, 10)).toBe("DERISK");
     expect(correctFork(10_000n, 10_010n, 10)).toBe("NO_ACTION");
     const observed = observe({ price: 10_000n, expo: -8, publishTime: NOW }, { price: 10_020n, expo: -8, publishTime: NOW + 180 }, 10);
-    const o = buildOutcome({ decisionId: "7", expectedAction: "DEPLOY", observed, source: { kind: "preview" }, timestamp: NOW + 200, tx: null });
+    const o = buildOutcome({ decisionId: "7", expectedAction: "DEPLOY", observed, source: { kind: "simulation" }, timestamp: NOW + 200, tx: null });
     expect(o).toMatchObject({ expectedAction: "DEPLOY", success: true, status: "VERIFIED" });
-    expect(buildOutcome({ decisionId: "7", expectedAction: "DEPLOY", observed: null, source: { kind: "preview" }, timestamp: NOW, tx: null }).status).toBe("VOID");
+    expect(buildOutcome({ decisionId: "7", expectedAction: "DEPLOY", observed: null, source: { kind: "simulation" }, timestamp: NOW, tx: null }).status).toBe("VOID");
   });
 });
 

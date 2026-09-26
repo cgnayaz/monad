@@ -1,7 +1,7 @@
 import type { AgentSpec } from "@/lib/jev/agents";
 import type { Action } from "@/lib/model/action";
 import type { Aggregation } from "@/lib/model/aggregation";
-import type { DecisionBatch } from "@/lib/model/decision";
+import type { AgentRun, DecisionBatch } from "@/lib/model/decision";
 import type { DecisionParameters } from "@/lib/model/final-decision";
 import type { AgentId, DecisionId, UnixSeconds } from "@/lib/model/primitives";
 import type { QuestionSet } from "@/lib/model/question";
@@ -34,6 +34,13 @@ export interface ExecutionLayer {
   readAggregation(decisionId: DecisionId): Promise<Aggregation>;
   /** ExecutionVault.execute — refuses if `action.fork` differs from the on-chain approved action. */
   execute(decisionId: DecisionId, action: Action): Promise<{ tx: TxRef; executedAt: UnixSeconds }>;
+}
+
+/** Destination for the off-chain payloads of a live decision (content-addressed). */
+export interface PayloadSink {
+  putState(state: StateRecord): Promise<void>;
+  putQuestions(set: QuestionSet): Promise<void>;
+  putRun(run: AgentRun): Promise<void>;
 }
 
 export interface ReputationRecords {

@@ -25,7 +25,7 @@ export interface ObservedResult {
 
 export type VerificationSource =
   | { kind: "pyth"; chainId: number; contract: Address; feedId: Hex; window: { from: UnixSeconds; to: UnixSeconds } }
-  | { kind: "preview" }; // computed off-chain; never shown as a verified outcome
+  | { kind: "simulation" }; // computed off-chain; never shown as a verified outcome
 
 export interface Outcome {
   decisionId: DecisionId;

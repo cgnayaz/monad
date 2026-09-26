@@ -4,6 +4,7 @@ import { ChainExecutionLayer } from "@/lib/chain/execution-layer";
 import { deployment } from "@/lib/chain/deployments";
 import { collectState } from "@/lib/collectors";
 import { listAgents } from "@/lib/data/agents";
+import { payloadStore } from "@/lib/store/payload-store";
 import { latestPriceUpdate, priceUpdateAt } from "@/lib/collectors/pyth";
 import { serverEnv } from "@/lib/config/server";
 import { DEFAULT_PARAMS } from "@/lib/decmarkt/params";
@@ -30,6 +31,13 @@ export const DECISION_PARAMETERS: DecisionParameters = {
   lockPerAgent: DEFAULT_PARAMS.lockPerAgent,
 };
 
+/**
+ * Parameters for the judge-facing demo: a 90 s submission window and a 60 s horizon so a
+ * full round — including the verified outcome — fits in a few minutes. The mechanism is
+ * identical; only the time scale differs (and is shown in the UI).
+ */
+export const DEMO_PARAMETERS: DecisionParameters = { ...DECISION_PARAMETERS, submissionWindow: 90, horizon: 60 };
+
 export function chainExecutionLayer(): { layer: ChainExecutionLayer } | { layer: null; reason: string } {
   const d = deployment();
   if (!d.deployed) return { layer: null, reason: "Contracts are not deployed; nothing is written on-chain" };
@@ -52,15 +60,17 @@ export function chainExecutionLayer(): { layer: ChainExecutionLayer } | { layer:
 
 export type PipelineSetup = { ok: true; deps: PipelineDeps } | { ok: false; reason: string };
 
-export async function pipelineSetup(): Promise<PipelineSetup> {
+export async function pipelineSetup(mode: "simulation" | "live" = "live"): Promise<PipelineSetup> {
   const provider = getDecisionProvider();
   if (provider.status !== "ok") return { ok: false, reason: provider.reason };
 
-  const chain = chainExecutionLayer();
+  const available = chainExecutionLayer();
+  if (mode === "live" && !available.layer) return { ok: false, reason: `Live testnet mode unavailable: ${available.reason}` };
+  const chain = mode === "live" ? available : { layer: null, reason: "Simulation mode: no transactions are sent" };
   let reputation: ReputationRecords = { source: "none-recorded", records: {} };
   if (chain.layer) {
     reputation = await chain.layer.reputation();
-  } else if (deployment().deployed) {
+  } else if (available.layer || deployment().deployed) {
     const views = await listAgents();
     const records: ReputationRecords["records"] = {};
     for (const v of views) {
@@ -76,11 +86,13 @@ export async function pipelineSetup(): Promise<PipelineSetup> {
       collectState,
       provider: provider.value,
       agents: AGENTS,
-      params: DECISION_PARAMETERS,
+      params: DEMO_PARAMETERS,
       reputation,
       execution: chain.layer,
-      previewReason: chain.layer ? undefined : chain.reason,
+      simulationReason: chain.layer ? undefined : chain.reason,
       agentTimeoutMs: 60_000,
+      payloads: payloadStore().store,
+      executionPolicy: "defer",
     },
   };
 }

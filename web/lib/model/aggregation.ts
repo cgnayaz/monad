@@ -23,7 +23,7 @@ export interface AggregationGates {
 
 export interface Aggregation {
   decisionId: DecisionId;
-  source: "engine" | "preview"; // engine = read from DecisionEngine
+  source: "engine" | "simulation"; // engine = read from DecisionEngine
   inputs: AggregationInput[]; // empty when read from chain without submissions
   support: Record<Fork, bigint>;
   total: bigint;

@@ -45,7 +45,7 @@ const deps = (provider: DecisionProvider, execution: ExecutionLayer | null = nul
   params: PARAMS,
   reputation: { source: "none-recorded", records: {} },
   execution,
-  previewReason: execution ? undefined : "test preview",
+  simulationReason: execution ? undefined : "test simulation",
   agentTimeoutMs: timeoutMs,
   now: () => NOW,
 });
@@ -55,7 +55,7 @@ describe("Decision pipeline — preview", () => {
     const events: PipelineEvent[] = [];
     const d = await runDecisionPipeline(deps(new ScriptedProvider({ YIELD: { kind: "answer", choice: "NO_ACTION" } })), (e) => events.push(e));
 
-    expect(d.mode).toBe("preview");
+    expect(d.mode).toBe("simulation");
     expect(d.decisionId).toBe("0");
     expect(d.state.hash).toMatch(/^0x[0-9a-f]{64}$/);
     expect(d.questions.questions).toHaveLength(6);
@@ -71,7 +71,7 @@ describe("Decision pipeline — preview", () => {
     expect(d.aggregateProbability).toBe(7000);
     expect(d.action).toMatchObject({ fork: "DERISK", approvedBy: "engine" });
     expect(d.action).not.toHaveProperty("calldata");
-    expect(d.execution).toEqual({ status: "not-submitted", reason: "test preview" });
+    expect(d.execution).toEqual({ status: "not-submitted", reason: "test simulation" });
 
     const stages = events.filter((e) => e.type === "stage").map((e) => `${e.stage}:${e.status}`);
     expect(stages).toContain("COMMIT:skipped");
