@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { StatusMark } from "@/components/ui/status";
 import type { Readiness } from "@/lib/data/readiness";
 
@@ -23,6 +24,14 @@ export function ReadinessPanel({ r }: { r: Readiness }) {
           </li>
         ))}
       </ul>
+      {!r.signers.ok && r.contracts.ok && (
+        <p className="border-t border-rule px-4 py-2.5 text-[12.5px] text-ink-2">
+          Canlı mod için imzacıları kurun:{" "}
+          <Link href="/kurulum" className="text-ink underline decoration-rule underline-offset-2 hover:decoration-ink">
+            Kurulum sayfası →
+          </Link>
+        </p>
+      )}
       {(!r.ai.ok || !r.oracle.ok) && r.env.similarNames.length > 0 && (
         <p className="border-t border-rule px-4 py-2.5 text-[12.5px] text-fail">
           Tanınmayan benzer değişken adları: <span className="font-mono">{r.env.similarNames.join(", ")}</span> — adlar tam olarak{" "}

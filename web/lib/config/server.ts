@@ -21,6 +21,8 @@ const ServerEnv = z.object({
   AI_FALLBACK_MODEL: z.string().min(1).optional(),
   PYTH_HERMES_URL: z.string().url().default("https://pyth.dourolabs.app/hermes"),
   PYTH_API_KEY: z.string().min(1).optional(),
+  /** One secret from which all signer keys (and the session key) are derived when not set explicitly. */
+  SIGNER_SEED: z.string().min(32).optional(),
   PROPOSER_PRIVATE_KEY: privateKey.optional(),
   KEEPER_PRIVATE_KEY: privateKey.optional(),
   AGENT_RISK_PRIVATE_KEY: privateKey.optional(),

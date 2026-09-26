@@ -8,17 +8,17 @@ import { EmptyState, StatusMark, type Tone } from "@/components/ui/status";
 import { Table, Td, Th } from "@/components/ui/table";
 import { explorer } from "@/lib/chain/monad";
 import { agentLedger } from "@/lib/data/accountability";
-import { listAgents } from "@/lib/data/agents";
+import { readAgent } from "@/lib/data/agents";
 import { formatBps, formatMon, formatUtc } from "@/lib/format";
 import { AGENT_TR, agentName, resultLabel } from "@/lib/i18n";
-import { AGENTS } from "@/lib/jev/agents";
+import { specOf } from "@/lib/jev/agents";
 import { DOMAIN_LABEL } from "@/lib/view/decision-view";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: PageProps<"/agents/[id]">): Promise<Metadata> {
   const { id } = await props.params;
-  const a = AGENTS.find((x) => String(x.agentId) === id);
+  const a = /^\d{1,2}$/.test(id) ? specOf(Number(id)) : null;
   return { title: a ? agentName(a.key, a.name) : "Ajan" };
 }
 
@@ -28,10 +28,9 @@ const signed = (w: bigint) => (w < 0n ? `−${formatMon(-w)}` : `+${formatMon(w)
 /** One agent's record: every prediction it made on-chain, what happened, and what it cost or earned. */
 export default async function AgentPage(props: PageProps<"/agents/[id]">) {
   const { id } = await props.params;
-  const spec = AGENTS.find((a) => String(a.agentId) === id);
-  if (!spec) notFound();
-  const [ledger, views] = await Promise.all([agentLedger(spec.agentId), listAgents()]);
-  const onChain = views.find((x) => x.spec.agentId === spec.agentId)!.onChain;
+  if (!/^\d{1,2}$/.test(id) || Number(id) > 15) notFound();
+  const spec = { ...specOf(Number(id)), agentId: Number(id) };
+  const [ledger, onChain] = await Promise.all([agentLedger(spec.agentId), readAgent(spec.agentId)]);
 
   return (
     <>

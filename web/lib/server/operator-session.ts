@@ -6,6 +6,7 @@ import { publicClient } from "@/lib/chain/client";
 import { deployment } from "@/lib/chain/deployments";
 import { MONAD_TESTNET } from "@/lib/config/public";
 import type { Address } from "@/lib/types/protocol";
+import { derivedSessionSecret } from "@/lib/chain/signers";
 
 /**
  * Operator sessions. Anything that makes the server spend gas from its keys or lock agent
@@ -23,7 +24,7 @@ const SESSION_TTL = 30 * 60;
 const used = new Set<string>();
 
 function secret(): Buffer | null {
-  const s = process.env.SESSION_SECRET;
+  const s = process.env.SESSION_SECRET?.trim() || derivedSessionSecret();
   return s && s.length >= 32 ? Buffer.from(s) : null;
 }
 

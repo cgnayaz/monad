@@ -4,7 +4,7 @@ import { decisionEngineAbi, decisionRegistryAbi, executionVaultAbi, outcomeRegis
 import { publicClient } from "@/lib/chain/client";
 import { CONTRACT_NAMES, deployment, type ContractName, type Deployment } from "@/lib/chain/deployments";
 import { MONAD_TESTNET } from "@/lib/config/public";
-import { AGENTS } from "@/lib/jev/agents";
+import { specOf } from "@/lib/jev/agents";
 import { leadingMetrics } from "@/lib/decmarkt/aggregate";
 import { ACTION_SPACE } from "@/lib/model/action";
 import type { Action } from "@/lib/model/action";
@@ -128,9 +128,10 @@ export async function getDecisionProvenance(id: bigint): Promise<Availability<De
     const txAt = (s: Status) => decision.transitions.find((t) => t.status === s)?.tx ?? null;
 
     const agents: AgentRef[] = await Promise.all(
-      AGENTS.map(async (a) => {
-        const onChain = await publicClient.readContract({ address: addr.DecisionRegistry, abi: decisionRegistryAbi, functionName: "getAgent", args: [a.agentId] });
-        return { agentId: a.agentId, key: a.key, name: a.name, operator: onChain.operator as Address };
+      participants.map(async (agentId) => {
+        const a = specOf(agentId);
+        const onChain = await publicClient.readContract({ address: addr.DecisionRegistry, abi: decisionRegistryAbi, functionName: "getAgent", args: [agentId] });
+        return { agentId, key: a.key, name: a.name, operator: onChain.operator as Address };
       }),
     );
 

@@ -5,7 +5,7 @@ import { useWalletTx } from "@/components/wallet/use-wallet-tx";
 import { DEFAULT_PARAMS } from "@/lib/decmarkt/params";
 import { settle } from "@/lib/decmarkt/settlement";
 import type { Wire } from "@/lib/engine/wire";
-import { AGENTS } from "@/lib/jev/agents";
+import { specOf } from "@/lib/jev/agents";
 import { correctFork, moveBps } from "@/lib/jev/move";
 import type { Settlement } from "@/lib/model/accountability";
 import type { PipelineEvent } from "@/lib/model/final-decision";
@@ -83,14 +83,11 @@ async function json<T>(res: Response): Promise<T> {
 /** Settlement with OutcomeRegistry's formula on notional bonds; nothing is locked or transferred. */
 function notionalSettlement(d: NonNullable<RoundProgress["decision"]>, observed: Exclude<Fork, "ESCALATE">): Settlement {
   const bond = BigInt(d.parameters.lockPerAgent);
-  const participants = AGENTS.map((a) => {
-    const out = d.agents.find((x) => x.agentId === a.agentId);
-    return {
-      agentId: a.agentId,
-      bond,
-      submission: out && out.status === "ok" ? { choice: out.final.choice, probability: toProbability(out.final.probability) } : null,
-    };
-  });
+  const participants = d.agents.map((out) => ({
+    agentId: out.agentId,
+    bond,
+    submission: out.status === "ok" ? { choice: out.final.choice, probability: toProbability(out.final.probability) } : null,
+  }));
   return settle("0", participants, observed, { slashBps: DEFAULT_PARAMS.slashBps, missPenaltyBps: DEFAULT_PARAMS.missPenaltyBps, roundReward: DEFAULT_PARAMS.roundReward });
 }
 
@@ -170,7 +167,7 @@ export function useDemo() {
         case "submission":
           setProgress((p) => ({ ...p, submissions: { ...p.submissions, [e.agentId]: e.tx } }));
           addTx({
-            label: `submitBatch · ${AGENTS.find((a) => a.agentId === e.agentId)?.name ?? e.agentId}`,
+            label: `submitBatch · ${specOf(e.agentId).name}`,
             hash: e.tx?.hash ?? null,
             status: e.tx ? "confirmed" : "failed",
             detail: e.error ?? undefined,

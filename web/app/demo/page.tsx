@@ -24,7 +24,7 @@ export default async function DemoPage() {
     submissions: {},
     decision: null,
   });
-  const r = readiness();
+  const r = await readiness();
 
   return (
     <>

@@ -71,3 +71,16 @@ export function agentByKey(key: AgentKey): AgentSpec {
   if (!a) throw new Error(`Unknown agent ${key}`);
   return a;
 }
+
+/**
+ * The role behind an on-chain agent id. Roles are registered in a fixed order, so the original
+ * operators hold ids 0–4 and re-registered ones 5–9; `id % 5` maps either back to its role.
+ */
+export function specOf(agentId: number): AgentSpec {
+  return AGENTS[((agentId % AGENTS.length) + AGENTS.length) % AGENTS.length];
+}
+
+/** True when an on-chain agent id belongs to the given role (any registration generation). */
+export function isRole(agentId: number, spec: AgentSpec): boolean {
+  return specOf(agentId).key === spec.key;
+}

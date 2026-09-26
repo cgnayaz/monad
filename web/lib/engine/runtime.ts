@@ -6,11 +6,13 @@ import { collectState } from "@/lib/collectors";
 import { listAgents } from "@/lib/data/agents";
 import { payloadStore } from "@/lib/store/payload-store";
 import { latestPriceUpdate, priceUpdateAt } from "@/lib/collectors/pyth";
-import { serverEnv } from "@/lib/config/server";
+import { resolveAgentIds } from "@/lib/chain/agent-ids";
+import { signerKeys } from "@/lib/chain/signers";
 import { DEFAULT_PARAMS, ROUND_TIMING } from "@/lib/decmarkt/params";
 import { AGENTS } from "@/lib/jev/agents";
 import type { DecisionParameters } from "@/lib/model/final-decision";
 import { FORKS, type AgentKey, type Hex } from "@/lib/types/protocol";
+import type { AgentSpec } from "@/lib/jev/agents";
 import type { PipelineDeps } from "./pipeline";
 import type { ReputationRecords } from "./ports";
 
@@ -41,18 +43,18 @@ export const DEMO_PARAMETERS: DecisionParameters = {
 export function chainExecutionLayer(): { layer: ChainExecutionLayer } | { layer: null; reason: string } {
   const d = deployment();
   if (!d.deployed) return { layer: null, reason: "Kontratlar dağıtılmamış; zincire hiçbir şey yazılmaz" };
-  const env = serverEnv();
-  const agents = Object.fromEntries(AGENTS.map((a) => [a.key, env[a.operatorKeyEnv]])) as Record<AgentKey, Hex | undefined>;
+  const keys = signerKeys();
+  const agents = keys.agents;
   const missing = [
-    ...(env.PROPOSER_PRIVATE_KEY ? [] : ["proposer"]),
-    ...(env.KEEPER_PRIVATE_KEY ? [] : ["keeper"]),
+    ...(keys.proposer ? [] : ["proposer"]),
+    ...(keys.keeper ? [] : ["keeper"]),
     ...AGENTS.filter((a) => !agents[a.key]).map((a) => a.name),
   ];
   if (missing.length) return { layer: null, reason: `İmzacılar yapılandırılmamış (${missing.join(", ")}); zincire hiçbir şey yazılmaz` };
   return {
     layer: new ChainExecutionLayer(
       d.addresses,
-      { proposer: env.PROPOSER_PRIVATE_KEY as Hex, keeper: env.KEEPER_PRIVATE_KEY as Hex, agents: agents as Record<AgentKey, Hex> },
+      { proposer: keys.proposer as Hex, keeper: keys.keeper as Hex, agents: agents as Record<AgentKey, Hex> },
       { latest: latestPriceUpdate, at: priceUpdateAt },
     ),
   };
@@ -67,6 +69,14 @@ export async function pipelineSetup(mode: "simulation" | "live" = "live"): Promi
   const available = chainExecutionLayer();
   if (mode === "live" && !available.layer) return { ok: false, reason: `Live testnet mode unavailable: ${available.reason}` };
   const chain = mode === "live" ? available : { layer: null, reason: "Simülasyon modu: hiçbir işlem gönderilmez" };
+  // Live rounds submit from the configured operators, under the ids they hold on chain.
+  let agents: readonly AgentSpec[] = AGENTS;
+  if (chain.layer) {
+    const r = await resolveAgentIds();
+    const missing = AGENTS.filter((a) => !r.registered[a.key]).map((a) => a.name);
+    if (missing.length) return { ok: false, reason: `Ajan operatörleri zincirde kayıtlı değil (${missing.join(", ")}); /kurulum sayfasından kaydedin` };
+    agents = AGENTS.map((a) => ({ ...a, agentId: r.ids[a.key] }));
+  }
   let reputation: ReputationRecords = { source: "none-recorded", records: {} };
   if (chain.layer) {
     reputation = await chain.layer.reputation();
@@ -85,7 +95,7 @@ export async function pipelineSetup(mode: "simulation" | "live" = "live"): Promi
     deps: {
       collectState,
       provider: provider.value,
-      agents: AGENTS,
+      agents,
       params: DEMO_PARAMETERS,
       reputation,
       execution: chain.layer,
