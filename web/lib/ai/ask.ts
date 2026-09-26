@@ -5,7 +5,8 @@ import { supportsThinkingLevel } from "./gemini";
 import { AGENTS } from "@/lib/jev/agents";
 import { AGENT_TR } from "@/lib/i18n";
 import { DEFAULT_PARAMS, ROUND_TIMING } from "@/lib/decmarkt/params";
-import { providerConfig } from "./index";
+import { compatConfig, providerConfig } from "./index";
+import { chatCompletion } from "./openai-compatible";
 
 /**
  * "Soru sor": answers visitors' questions about DecMarkt in Turkish. The model only explains
@@ -34,7 +35,26 @@ const SYSTEM = [
 
 export class AskError extends Error {}
 
+/** Gemini first; the OpenAI-compatible provider (Groq, OpenRouter, …) when Gemini is missing or fails. */
 export async function askDecMarkt(question: string, signal: AbortSignal): Promise<{ answer: string; model: string }> {
+  const compat = compatConfig();
+  const alt = compat && !("reason" in compat) ? compat : null;
+  try {
+    return await askGemini(question, signal);
+  } catch (err) {
+    if (!alt || signal.aborted) throw err;
+    try {
+      const r = await chatCompletion(alt, alt.model, [{ role: "system", content: SYSTEM }, { role: "user", content: question }], { json: false, maxTokens: 1_500, signal });
+      const answer = r.text.trim();
+      if (!answer) throw new AskError("Model boş yanıt döndürdü.");
+      return { answer, model: r.model };
+    } catch (e) {
+      throw e instanceof AskError ? e : new AskError(`Şu an yanıt verilemiyor (${publicError(e, "bilinmeyen hata")}).`);
+    }
+  }
+}
+
+async function askGemini(question: string, signal: AbortSignal): Promise<{ answer: string; model: string }> {
   const c = providerConfig();
   if (c.provider !== "gemini" || !c.key) throw new AskError("Soru-cevap için Gemini yapılandırılmamış (GEMINI_API_KEY).");
   const ai = new GoogleGenAI({ apiKey: c.key });
