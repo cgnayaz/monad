@@ -47,6 +47,20 @@ registers the five agents, and writes `web/lib/chain/deployments.10143.json`
 Post-deploy (script `Setup.s.sol`): bond each agent from its own key, fund vault and
 reward pool, run one smoke round.
 
+### Deploy + setup (Monad Testnet)
+
+```bash
+cd contracts
+forge script script/Deploy.s.sol --rpc-url monad_testnet --broadcast   # contracts, roles, agents → deployments JSON
+forge script script/Setup.s.sol  --rpc-url monad_testnet --broadcast   # vault 1+1 MON, reward pool 0.5, bonds 5×0.5, gas for operators
+cd ../web && node scripts/sync-abis.mjs
+```
+
+`contracts/.env` holds the deployer key and the public addresses; `web/.env.local` holds the
+proposer, keeper and agent keys. `GUARDIAN_ADDRESS` and `ADMIN_ADDRESS` are the operator's
+own browser wallet, which can then act as guardian and admin from the UI. Budget: ≈ 8 MON
+(≈ 1.3 deployment gas, 2 vault, 0.5 reward pool, 2.5 bonds, 1.8 operator gas).
+
 ## 4. Web (Vercel)
 
 - Root directory: `web/`. Framework: Next.js. Node 24.

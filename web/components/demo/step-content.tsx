@@ -14,6 +14,8 @@ import { ACTION_SPACE } from "@/lib/model/action";
 import type { Settlement } from "@/lib/model/accountability";
 import { FORKS } from "@/lib/types/protocol";
 import type { DecisionView } from "@/lib/view/decision-view";
+import { TxLifecycle } from "@/components/wallet/tx-lifecycle";
+import type { TxState } from "@/components/wallet/use-wallet-tx";
 import type { ChainTx, DemoMode, VerifyResult } from "./use-demo";
 
 const muted = (s: string) => <span className="text-ink-3">{s}</span>;
@@ -253,11 +255,13 @@ export function MonadStep({
   txs,
   awaiting,
   onExecute,
+  walletTx,
 }: {
   mode: DemoMode;
   txs: ChainTx[];
   awaiting: boolean;
   onExecute: (via: "wallet" | "keeper") => void;
+  walletTx?: TxState;
 }) {
   const { isConnected, chainId } = useAccount();
   const { switchChain } = useSwitchChain();
@@ -292,6 +296,7 @@ export function MonadStep({
           </li>
         ))}
       </ol>
+      {walletTx && <TxLifecycle state={walletTx} />}
       {awaiting && (
         <div className="flex flex-wrap items-center gap-3 border border-accent px-4 py-3">
           <p className="min-w-0 flex-1 basis-64 text-[13px]">The action is approved on-chain. Execute it from your wallet — anyone may; the contract decides what runs.</p>

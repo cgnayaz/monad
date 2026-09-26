@@ -20,6 +20,7 @@ import { ProvenanceTrail } from "@/components/domain/provenance-trail";
 import { Hash } from "@/components/ui/hash";
 import { PageHeader, Section } from "@/components/ui/layout";
 import { EmptyState, StatusMark } from "@/components/ui/status";
+import { LifecycleActions } from "@/components/wallet/lifecycle-actions";
 import { explorer } from "@/lib/chain/monad";
 import { getDecisionProvenance } from "@/lib/data/decisions";
 import { attachVerifiedPayloads } from "@/lib/data/payloads";
@@ -86,6 +87,24 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
       <div className="mb-6">
         <LifecycleRail current={d.status} transitions={d.transitions} />
       </div>
+      {!["RESOLVED", "CANCELLED"].includes(d.status) && (
+        <div className="mb-6 max-w-[760px]">
+          <LifecycleActions
+            ctx={{
+              decisionId: d.decisionId,
+              status: d.status,
+              deadline: d.deadline,
+              finalsSubmitted: p.submissions.filter((s) => s.questionIndex === 0).length,
+              participants: d.participants.length,
+              guardianRequired: p.aggregation?.guardianRequired ?? false,
+              guardianDeadline: p.aggregation?.guardianDeadline ?? null,
+              allowedForks: d.config.allowedForks,
+              executedAt: p.action?.execution?.executedAt ?? null,
+              horizon: d.config.horizon,
+            }}
+          />
+        </div>
+      )}
       <div className="mb-6">
         <JevTrack stages={v.stages} />
       </div>

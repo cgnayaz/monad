@@ -1,11 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePublicClient, useWriteContract } from "wagmi";
-import { executionVaultAbi } from "@/lib/chain/abis";
-import { contractAddress } from "@/lib/chain/deployments";
-import { monadTestnet } from "@/lib/chain/monad";
-import { PYTH } from "@/lib/config/public";
+import { useWalletTx } from "@/components/wallet/use-wallet-tx";
 import { DEFAULT_PARAMS } from "@/lib/decmarkt/params";
 import { settle } from "@/lib/decmarkt/settlement";
 import type { Wire } from "@/lib/engine/wire";
@@ -96,8 +92,7 @@ export function useDemo() {
   const [parallelStartedAt, setParallelStartedAt] = useState<number | null>(null);
   const cancelled = useRef(false);
 
-  const publicClient = usePublicClient({ chainId: monadTestnet.id });
-  const { writeContractAsync } = useWriteContract();
+  const walletTx = useWalletTx();
 
   const set = useCallback((key: StepKey, s: StepState) => setSteps((prev) => ({ ...prev, [key]: s })), []);
   const fail = useCallback((key: StepKey, error: string) => {
@@ -325,21 +320,9 @@ export function useDemo() {
           if (r.step !== "execute" || !r.tx) throw new Error(r.note ?? `Unexpected step ${r.step}`);
           addTx({ label: "ExecutionVault.execute", hash: r.tx.hash, status: "confirmed", detail: "keeper" });
         } else {
-          const vault = contractAddress("ExecutionVault");
-          if (!vault || !publicClient) throw new Error("Vault address or RPC unavailable");
-          const update = await json<{ data: `0x${string}`[] }>(await fetch("/api/oracle/update", { cache: "no-store" }));
-          const fee = await publicClient.readContract({
-            address: PYTH.contract,
-            abi: [{ type: "function", name: "getUpdateFee", stateMutability: "view", inputs: [{ name: "u", type: "bytes[]" }], outputs: [{ name: "f", type: "uint256" }] }] as const,
-            functionName: "getUpdateFee",
-            args: [update.data],
-          });
-          addTx({ label: "ExecutionVault.execute", hash: null, status: "pending", detail: "awaiting wallet approval" });
-          const hash = await writeContractAsync({ address: vault, abi: executionVaultAbi, functionName: "execute", args: [BigInt(decisionId), update.data], value: fee, chainId: monadTestnet.id });
-          addTx({ label: "ExecutionVault.execute", hash, status: "pending", detail: "submitted; waiting for confirmation" });
-          const receipt = await publicClient.waitForTransactionReceipt({ hash });
-          if (receipt.status !== "success") throw new Error(`Transaction reverted (${hash})`);
-          addTx({ label: "ExecutionVault.execute", hash, status: "confirmed", detail: `block ${receipt.blockNumber}` });
+          const receipt = await walletTx.run({ kind: "execute", decisionId });
+          if (!receipt) throw new Error("wallet transaction did not confirm (see the transaction panel)");
+          addTx({ label: "ExecutionVault.execute", hash: receipt.hash, status: "confirmed", detail: `wallet · block ${receipt.blockNumber}` });
         }
         set("ACTION", { status: "done" });
         set("MONAD", { status: "done" });
@@ -350,7 +333,7 @@ export function useDemo() {
       }
       await liveVerifyAndSettle(decisionId);
     },
-    [advance, decision?.action, decisionId, fail, liveVerifyAndSettle, publicClient, set, writeContractAsync],
+    [advance, decision?.action, decisionId, fail, liveVerifyAndSettle, set, walletTx],
   );
 
   // ─── Start / retry ──────────────────────────────────────────────────────
@@ -486,6 +469,7 @@ export function useDemo() {
     startedAt,
     parallelStartedAt,
     awaitingExecution,
+    walletTx: walletTx.state,
     start,
     retry,
     executeLive,

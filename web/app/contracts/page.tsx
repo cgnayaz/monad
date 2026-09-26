@@ -4,6 +4,7 @@ import { Hash } from "@/components/ui/hash";
 import { KeyValue, PageHeader, Panel, Section } from "@/components/ui/layout";
 import { StatusMark } from "@/components/ui/status";
 import { Table, Td, Th } from "@/components/ui/table";
+import { WalletRoles } from "@/components/wallet/wallet-roles";
 import { deployment } from "@/lib/chain/deployments";
 import { explorer } from "@/lib/chain/monad";
 import { MONAD_TESTNET, PYTH, REPO_URL } from "@/lib/config/public";
@@ -36,7 +37,7 @@ export default async function ContractsPage() {
         lead="Four contracts with separated responsibilities. Each lifecycle transition belongs to exactly one of them; the vault has no external call path. Every address and value below is read from the network on each request."
       />
 
-      <div className="mb-14 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="mb-14 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Panel title="Network">
           <KeyValue
             rows={[
@@ -59,6 +60,7 @@ export default async function ContractsPage() {
             ]}
           />
         </Panel>
+        <WalletRoles />
       </div>
 
       <Section title="DecMarkt contracts" description="Bytecode presence is checked against the RPC for every address.">

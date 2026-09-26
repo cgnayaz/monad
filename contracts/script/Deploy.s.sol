@@ -12,7 +12,7 @@ import {OutcomeRegistry} from "../src/OutcomeRegistry.sol";
 ///         five agents and writes web/lib/chain/deployments.10143.json.
 ///
 /// Required env (contracts/.env, never committed):
-///   DEPLOYER_PRIVATE_KEY, PROPOSER_ADDRESS, GUARDIAN_ADDRESS,
+///   DEPLOYER_PRIVATE_KEY, PROPOSER_ADDRESS, GUARDIAN_ADDRESS, [ADMIN_ADDRESS — optional second admin],
 ///   AGENT_RISK_ADDRESS, AGENT_YIELD_ADDRESS, AGENT_SECURITY_ADDRESS, AGENT_MARKET_ADDRESS, AGENT_HISTORY_ADDRESS
 ///
 ///   forge script script/Deploy.s.sol --rpc-url monad_testnet --broadcast
@@ -49,6 +49,15 @@ contract Deploy is Script {
         registry.grantRole(registry.PROPOSER_ROLE(), proposer);
         engine.grantRole(engine.GUARDIAN_ROLE(), guardian);
         registry.setRoundReward(ROUND_REWARD);
+
+        address extraAdmin = vm.envOr("ADMIN_ADDRESS", address(0));
+        if (extraAdmin != address(0)) {
+            bytes32 adminRole = registry.DEFAULT_ADMIN_ROLE();
+            registry.grantRole(adminRole, extraAdmin);
+            engine.grantRole(adminRole, extraAdmin);
+            vault.grantRole(adminRole, extraAdmin);
+            outcome.grantRole(adminRole, extraAdmin);
+        }
 
         for (uint256 i = 0; i < 5; i++) {
             address operator = vm.envAddress(string.concat("AGENT_", keys[i], "_ADDRESS"));

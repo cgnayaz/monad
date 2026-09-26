@@ -1,14 +1,18 @@
-import { latestPriceUpdate } from "@/lib/collectors/pyth";
+import { latestPriceUpdate, priceUpdateAt } from "@/lib/collectors/pyth";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/oracle/update — the latest signed Pyth update data (bytes[]) for the wallet to pass
- * to ExecutionVault.execute. The contract verifies the signature; this route only relays it.
+ * GET /api/oracle/update[?at=unix] — signed Pyth update data (bytes[]) for a wallet to pass to
+ * ExecutionVault.execute (latest) or OutcomeRegistry.resolve (published at `at`). The
+ * contracts verify the signature and the publish-time window; this route only relays it.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  const at = new URL(req.url).searchParams.get("at");
+  if (at !== null && !/^\d{9,11}$/.test(at)) return Response.json({ error: "Invalid timestamp" }, { status: 400 });
   try {
-    return Response.json(await latestPriceUpdate(), { headers: { "Cache-Control": "no-store" } });
+    const u = at ? await priceUpdateAt(Number(at)) : await latestPriceUpdate();
+    return Response.json(u, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : "Oracle unavailable" }, { status: 503 });
   }

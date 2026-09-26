@@ -60,7 +60,7 @@ export function Demo({ modes, idle, allowedForks }: { modes: Record<DemoMode, Mo
     FORKS: <ForksStep v={v} allowed={allowedForks} />,
     AGGREGATION: <AggregationStep v={v} />,
     ACTION: <ActionStep v={v} mode={d.mode} sim={d.simExecution} />,
-    MONAD: <MonadStep mode={d.mode} txs={d.txs} awaiting={d.awaitingExecution} onExecute={d.executeLive} />,
+    MONAD: <MonadStep mode={d.mode} txs={d.txs} awaiting={d.awaitingExecution} onExecute={d.executeLive} walletTx={d.walletTx} />,
     VERIFY: (
       <div className="space-y-3">
         {d.countdown && <Countdown {...d.countdown} />}

@@ -74,6 +74,17 @@ before any agent runs), or generate calldata (every call is assembled from valid
 fields). Aggregation and the action are deterministic code; the on-chain aggregation is
 compared with the local one and execution is withheld on any mismatch.
 
+## 6a. Browser wallet
+
+A connected wallet can send exactly five transactions, each a fixed contract function
+whose arguments are a decision id (and, for a guardian, one of three bounded choices):
+`DecisionEngine.aggregate`, `guardianDecide`, `finalizeEscalation`,
+`ExecutionVault.execute`, `OutcomeRegistry.resolve` (`web/lib/chain/wallet-actions.ts`).
+Which one is offered follows from on-chain state. Before the wallet opens, the call is
+simulated against the chain and the balance is checked against value + gas; after
+submission the receipt is read and only `status: success` counts as confirmed. The AI layer
+never reaches this path, and no action takes an address, an amount or calldata from the UI.
+
 ## 7. Server input validation
 
 - `POST /api/decisions` ignores the request body entirely; `/advance` takes only a numeric id.
