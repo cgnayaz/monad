@@ -1,6 +1,8 @@
-# Monad Hackathon Projesi
+# DecMarkt — AI decisions with on-chain accountability
 
-Sıfırdan, Monad üzerinde MON token kullanan, AI agent destekli web3 uygulaması.
+Jev (karar yapısı) → DecMarkt (hesap verebilirlik: bond, eşik, ödül/ceza) → Monad (yürütme ve settlement).
+Tasarım belgeleri kökte: ARCHITECTURE, JEV_INTEGRATION, DATA_MODEL, CONTRACT_SPEC, SECURITY_MODEL, DESIGN_SYSTEM, DEMO_FLOW, DEPLOYMENT (.md). Kod yazmadan önce ilgili belgeyi oku; belgeyle çelişen değişikliği belgeye de işle.
+Kurallar: veri uydurma yok (hash, blok, bakiye, sonuç hep zincirden), AI calldata/anahtar yok, sadece sınırlı fork'lar.
 Kullanıcı Türkçe konuşur; cevaplar Türkçe olsun. Tarz: vibe coding — hızlı, çalışan demo öncelikli.
 
 ## Hedef
@@ -10,7 +12,8 @@ Mükemmel kod değil, **çalışan ve etkileyici demo** önemli. Her 1-2 saatte 
 ## Teknoloji
 - **Kontrat:** Solidity + Foundry (`contracts/`)
 - **Frontend:** Next.js (App Router) + TypeScript + Tailwind + wagmi + viem + RainbowKit (`web/`)
-- **AI agent:** Claude API, tool use (araç çağırma). Sunucu tarafında Next.js API route içinde çalışır (`web/app/api/agent/`)
+- **AI:** sunucu tarafı provider soyutlaması (`web/lib/ai/`), 5 bağımsız analist; round adımları `web/app/api/rounds/`
+- **Oracle:** Pyth (Monad testnet `0x2880aB155794e7179c9eE2e38200202908C17B43`, MON/USD)
 - Agent kodu yazarken önce `claude-api` skill'ini yükle; model adlarını ezberden yazma.
 
 ## Monad bilgileri (etkinlikte doğrula!)
