@@ -1,5 +1,7 @@
 import "server-only";
-import { ApiError, GoogleGenAI } from "@google/genai";
+import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { publicError } from "@/lib/server/public-error";
+import { supportsThinkingLevel } from "./gemini";
 import { AGENTS } from "@/lib/jev/agents";
 import { AGENT_TR } from "@/lib/i18n";
 import { DEFAULT_PARAMS, ROUND_TIMING } from "@/lib/decmarkt/params";
@@ -42,19 +44,31 @@ export async function askDecMarkt(question: string, signal: AbortSignal): Promis
       const res = await ai.models.generateContent({
         model,
         contents: [{ role: "user", parts: [{ text: question }] }],
-        config: { systemInstruction: SYSTEM, maxOutputTokens: 2_000, abortSignal: signal },
+        config: {
+          systemInstruction: SYSTEM,
+          // Same settings as the agents: low thinking, and room for thinking plus the answer.
+          ...(supportsThinkingLevel(model) ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
+          maxOutputTokens: 16_000,
+          abortSignal: signal,
+        },
       });
       const answer = (res.text ?? "").trim();
-      if (!answer) throw new AskError("Model boş yanıt döndürdü.");
+      if (!answer) {
+        const why = res.promptFeedback?.blockReason ?? res.candidates?.[0]?.finishReason ?? "boş yanıt";
+        throw new AskError(why === FinishReason.MAX_TOKENS ? "Yanıt çok uzun sürdü, soruyu kısaltıp tekrar deneyin." : `Model yanıt vermedi (${why}).`);
+      }
       return { answer, model: res.modelVersion ?? model };
     } catch (err) {
       last = err;
-      if (!(err instanceof ApiError && (err.status === 429 || err.status >= 500)) || signal.aborted) break;
+      console.error(`ask: ${model} failed:`, publicError(err, "unknown"));
+      // Try the next model on anything but a rejected key or a bad request.
+      if (err instanceof AskError || (err instanceof ApiError && [400, 401, 403].includes(err.status)) || signal.aborted) break;
     }
   }
   if (last instanceof AskError) throw last;
   if (signal.aborted) throw new AskError("Yanıt zamanında gelmedi, tekrar deneyin.");
   if (last instanceof ApiError && last.status === 429) throw new AskError("Gemini kotası doldu, birazdan tekrar deneyin.");
   if (last instanceof ApiError && (last.status === 400 || last.status === 401 || last.status === 403)) throw new AskError("Gemini anahtarı reddedildi.");
-  throw new AskError("Şu an yanıt verilemiyor, tekrar deneyin.");
+  const status = last instanceof ApiError ? `HTTP ${last.status}: ` : "";
+  throw new AskError(`Şu an yanıt verilemiyor (${status}${publicError(last, "bilinmeyen hata")}). Tekrar deneyin.`);
 }
