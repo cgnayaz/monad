@@ -111,3 +111,16 @@ describe("Demo steps render real pipeline output", () => {
     expect(settlement).toContain("itibari teminatlar");
   });
 });
+
+describe("Example scenario (no real price)", () => {
+  it("is labelled as an example in verify and settlement", async () => {
+    const d = await simulationRound();
+    const v = fromRound({ state: d.state, questions: d.questions, runs: {}, running: {}, submissions: {}, decision: d });
+    const verify = renderToStaticMarkup(
+      <VerifyStep mode="simulation" r={{ expected: "DERISK", observed: "DERISK", success: true, startPrice: "3,000", endPrice: "2,985", startTime: null, endTime: null, moveBps: "-50", bandBps: 10, source: "example" }} />,
+    );
+    expect(verify).toContain("ÖRNEK SENARYO");
+    const sim = settle("0", [{ agentId: 0, bond: 50_000_000_000_000_000n, submission: { choice: "DERISK", probability: toProbability(7000) } }], "DERISK", { slashBps: 3000, missPenaltyBps: 1000, roundReward: 0n });
+    expect(renderToStaticMarkup(<SettlementStep mode="simulation" v={v} sim={sim} example />)).toContain("Örnek senaryo");
+  });
+});

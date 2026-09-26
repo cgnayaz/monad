@@ -17,7 +17,7 @@ import { FORKS } from "@/lib/types/protocol";
 import type { DecisionView } from "@/lib/view/decision-view";
 import { TxLifecycle } from "@/components/wallet/tx-lifecycle";
 import type { TxState } from "@/components/wallet/use-wallet-tx";
-import type { ChainTx, DemoMode, VerifyResult } from "./use-demo";
+import type { ChainTx, DemoMode, ExampleMove, VerifyResult } from "./use-demo";
 
 const muted = (s: string) => <span className="text-ink-3">{s}</span>;
 
@@ -347,8 +347,15 @@ export function VerifyStep({ r, mode }: { r: VerifyResult | null; mode: DemoMode
       <span className="font-mono text-[13px]">{observed}</span>
     </div>
   );
+  const example = r.source === "example";
   return (
     <div className="border border-rule bg-surface">
+      {example && (
+        <p className="border-b border-rule bg-[repeating-linear-gradient(135deg,transparent_0_8px,var(--surface-2)_8px_9px)] px-4 py-2 text-[12px]">
+          <span className="mr-2 font-mono font-medium tracking-[0.06em]">ÖRNEK SENARYO</span>
+          <span className="text-ink-2">Fiyatlar gerçek değil; ajanların bu turdaki gerçek kararları varsayımsal bir fiyat hareketine göre değerlendiriliyor.</span>
+        </p>
+      )}
       <div className="grid grid-cols-[120px_1fr_1fr] gap-3 border-b border-rule bg-surface-2 px-4 py-2">
         <span />
         <span className="label">Beklenen</span>
@@ -360,7 +367,11 @@ export function VerifyStep({ r, mode }: { r: VerifyResult | null; mode: DemoMode
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
         <StatusMark tone={r.success ? "pass" : "fail"}>{r.success ? "başarılı — beklenen gözlenene eşit" : "isabetsiz — beklenen gözlenenden farklı"}</StatusMark>
         <span className="text-[11.5px] text-ink-3">
-          {mode === "live" ? "OutcomeRegistry tarafından pencere içindeki imzalı bir Pyth fiyatından kaydedildi." : "Yayımlanan Pyth fiyatından gözlendi; simülasyonda zincirde doğrulanmaz."}
+          {example
+            ? "Örnek fiyat hareketi; gerçek turda bu değerler imzalı Pyth fiyatından gelir."
+            : mode === "live"
+              ? "OutcomeRegistry tarafından pencere içindeki imzalı bir Pyth fiyatından kaydedildi."
+              : "Yayımlanan Pyth fiyatından gözlendi; simülasyonda zincirde doğrulanmaz."}
         </span>
       </div>
     </div>
@@ -369,7 +380,7 @@ export function VerifyStep({ r, mode }: { r: VerifyResult | null; mode: DemoMode
 
 // 11 ────────────────────────────────────────────────────────────────────────
 
-export function SettlementStep({ mode, v, sim }: { mode: DemoMode; v: DecisionView; sim: Settlement | null }) {
+export function SettlementStep({ mode, v, sim, example = false }: { mode: DemoMode; v: DecisionView; sim: Settlement | null; example?: boolean }) {
   const rows =
     mode === "simulation"
       ? (sim?.lines ?? []).map((l) => ({ agentId: l.agentId, result: l.result, bond: l.bond, penalty: l.penalty, reward: l.reward, net: l.net }))
@@ -411,10 +422,39 @@ export function SettlementStep({ mode, v, sim }: { mode: DemoMode; v: DecisionVi
         </tbody>
       </Table>
       <p className="text-[12px] text-ink-3">
-        {mode === "simulation"
+        {example
+          ? "Örnek senaryo: OutcomeRegistry'nin gerçek formülü, ajanların bu turdaki gerçek kararlarına ve varsayımsal fiyat hareketine uygulandı. Hiçbir teminat kilitlenmedi."
+          : mode === "simulation"
           ? "OutcomeRegistry formülüyle itibari teminatlar (MON) üzerinden hesaplandı. Hiçbir teminat kilitlenmedi ve hiçbir şey transfer edilmedi."
           : "OutcomeRegistry tarafından resolve işleminde uygulandı; teminatlar ve ödül havuzu zincirde değişti."}
       </p>
+    </div>
+  );
+}
+
+/** Shown when no real price is available: the decision is real, verification is explained with a labelled example. */
+export function ExampleChooser({ reason, onPick, action }: { reason: string; onPick: (m: ExampleMove) => void; action: string | null }) {
+  return (
+    <div className="border border-rule bg-surface px-4 py-3 text-[13px]">
+      <p className="font-medium">Gerçek fiyat verisi şu an alınamıyor.</p>
+      <p className="mt-1 text-ink-2">
+        Ajanların kararları ve toplama gerçek{action ? ` (seçilen eylem: ${action})` : ""}. Doğrulama için ufuk sonundaki gerçek ETH/USD fiyatı
+        gerekiyor; bu dağıtımda Pyth anahtarı yapılandırılmadığı için okunamadı.
+      </p>
+      <p className="mt-1 font-mono text-[11.5px] text-ink-3">{reason}</p>
+      <p className="mt-3 text-ink-2">Doğrulama ve ödül/ceza mekanizmasını bir örnek fiyat hareketiyle görün:</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={() => onPick("down")}>
+          Fiyat %0,5 düşerse
+        </Button>
+        <Button variant="secondary" onClick={() => onPick("flat")}>
+          Fiyat sabit kalırsa
+        </Button>
+        <Button variant="secondary" onClick={() => onPick("up")}>
+          Fiyat %0,5 yükselirse
+        </Button>
+      </div>
+      <p className="mt-2 text-[11.5px] text-ink-3">Sonuçlar “örnek senaryo” olarak işaretlenir ve kaydedilmez.</p>
     </div>
   );
 }
