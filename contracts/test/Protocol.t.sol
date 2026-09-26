@@ -182,7 +182,7 @@ contract ExecutionTest is Base {
 
     function test_StalePriceRejected() public {
         uint256 id = _approved(Choice.ACTION_A);
-        bytes[] memory u = _update(START_PRICE, block.timestamp - 61);
+        bytes[] memory u = _update(START_PRICE, block.timestamp - 11); // MAX_PRICE_AGE is 10 s
         vm.expectRevert(PythErrors.PriceFeedNotFoundWithinRange.selector);
         vault.execute{value: FEE}(id, u);
     }
@@ -247,24 +247,35 @@ contract OutcomeTest is Base {
 
     function test_BeforeHorizon() public {
         vm.warp(t0 - 1);
-        bytes[] memory u = _update(START_PRICE, t0 - 1);
+        bytes[] memory u = _unique(START_PRICE, t0 - 1, t0 - 2);
         vm.expectRevert(abi.encodeWithSelector(OutcomeRegistry.HorizonNotReached.selector, uint64(t0)));
         outcome.resolve{value: FEE}(id, u);
     }
 
     function test_PriceOutsideWindow() public {
         vm.warp(t0 + 100);
-        bytes[] memory late = _update(START_PRICE, t0 + 61);
+        bytes[] memory late = _unique(START_PRICE, t0 + 61, t0 - 1);
         vm.expectRevert(PythErrors.PriceFeedNotFoundWithinRange.selector);
         outcome.resolve{value: FEE}(id, late);
-        bytes[] memory early = _update(START_PRICE, t0 - 1);
+        bytes[] memory early = _unique(START_PRICE, t0 - 1, t0 - 2);
         vm.expectRevert(PythErrors.PriceFeedNotFoundWithinRange.selector);
         outcome.resolve{value: FEE}(id, early);
     }
 
+    /// @dev Security audit H-1: a resolver may not pick a later, more favourable update inside
+    ///      the window — only the first update at or after t0 is accepted.
+    function test_CannotCherryPickResolutionPrice() public {
+        vm.warp(t0 + 30);
+        bytes[] memory later = _unique(90_000_000, t0 + 20, t0 + 19); // inside the window, but not the first
+        vm.expectRevert(PythErrors.PriceFeedNotFoundWithinRange.selector);
+        outcome.resolve{value: FEE}(id, later);
+        outcome.resolve{value: FEE}(id, _unique(START_PRICE, t0 + 1, t0 - 1));
+        assertEq(uint8(_status(id)), uint8(Status.RESOLVED));
+    }
+
     function test_ResolveTwice() public {
         _resolve(id, START_PRICE);
-        bytes[] memory u = _update(START_PRICE, t0 + 1);
+        bytes[] memory u = _unique(START_PRICE, t0 + 1, t0 - 1);
         vm.expectRevert(abi.encodeWithSelector(OutcomeRegistry.InvalidTransition.selector, Status.RESOLVED, Status.RESOLVED));
         outcome.resolve{value: FEE}(id, u);
     }
@@ -272,13 +283,13 @@ contract OutcomeTest is Base {
     function test_ExpoMismatch() public {
         vm.warp(t0 + 1);
         bytes[] memory u = new bytes[](1);
-        u[0] = pyth.createPriceFeedUpdateData(PRICE_ID, 1_000_000, 10, -6, 1_000_000, 10, uint64(t0 + 1));
+        u[0] = pyth.createUniqueUpdateData(PRICE_ID, 1_000_000, -6, uint64(t0 + 1), uint64(t0 - 1));
         vm.expectRevert(abi.encodeWithSelector(OutcomeRegistry.ExpoMismatch.selector, int32(-8), int32(-6)));
         outcome.resolve{value: FEE}(id, u);
     }
 
     function test_VoidAfterGrace() public {
-        uint64 voidableAt = uint64(t0 + 60 + 300);
+        uint64 voidableAt = uint64(t0 + 60 + 1 hours);
         vm.warp(voidableAt);
         vm.expectRevert(abi.encodeWithSelector(OutcomeRegistry.GraceNotElapsed.selector, voidableAt));
         outcome.voidOutcome(id);

@@ -31,7 +31,7 @@ export interface StateInput {
 export interface StateSubject {
   vault: Address | null; // null until ExecutionVault is deployed
   asset: "MON";
-  referenceFeed: "MON/USD";
+  referenceFeed: string; // e.g. "ETH/USD" — the Pyth feed the outcome is measured on
   horizonSec: number;
   bandBps: number;
 }

@@ -194,7 +194,7 @@ export class ChainExecutionLayer implements ExecutionLayer {
     return { tx, executedAt: Number(e.executedAt) };
   }
 
-  /** OutcomeRegistry.resolve with a signed price published just after executedAt + horizon. */
+  /** OutcomeRegistry.resolve with the first signed price published at or after executedAt + horizon. */
   async resolve(decisionId: DecisionId): Promise<{ tx: TxRef }> {
     const id = BigInt(decisionId);
     const [d, e] = await Promise.all([
@@ -203,7 +203,8 @@ export class ChainExecutionLayer implements ExecutionLayer {
     ]);
     const t0 = Number(e.executedAt + d.config.horizon);
     if ((await this.chainTime()) < t0 + 1) throw new Error(`Horizon not reached; resolvable after ${t0}`);
-    const update = await this.prices.at(t0 + 1);
+    // The contract accepts only the first update at or after t0 (parsePriceFeedUpdatesUnique).
+    const update = await this.prices.at(t0);
     const fee = await publicClient.readContract({ address: PYTH.contract, abi: pythFeeAbi, functionName: "getUpdateFee", args: [update.data] });
     const hash = await this.wallet(this.keeper).writeContract({
       address: this.addr.OutcomeRegistry,

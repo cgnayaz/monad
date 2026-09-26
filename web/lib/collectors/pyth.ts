@@ -33,7 +33,7 @@ function scaled(p: { price: string; expo: number }): number {
 async function fetchPrice(path: string): Promise<PythSnapshot> {
   const env = serverEnv();
   if (!env.PYTH_API_KEY) throw new Error("PYTH_API_KEY is not configured");
-  const id = PYTH.monUsdFeedId;
+  const id = PYTH.feedId;
   const url = `${env.PYTH_HERMES_URL}${path}?ids%5B%5D=${id}&parsed=true`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${env.PYTH_API_KEY}` },
@@ -48,11 +48,11 @@ async function fetchPrice(path: string): Promise<PythSnapshot> {
 
 export async function collectPythInputs(now: number): Promise<StateInput[]> {
   const src = "pyth-hermes" as const;
-  const marketKeys = ["market.mon_usd.price", "market.mon_usd.conf", "market.mon_usd.ema_price", "market.mon_usd.publish_age"];
+  const marketKeys = ["market.ref.price", "market.ref.conf", "market.ref.ema_price", "market.ref.publish_age"];
   const historyWindows = [
-    { key: "history.mon_usd.change_5m", seconds: 300 },
-    { key: "history.mon_usd.change_1h", seconds: 3_600 },
-    { key: "history.mon_usd.change_24h", seconds: 86_400 },
+    { key: "history.ref.change_5m", seconds: 300 },
+    { key: "history.ref.change_1h", seconds: 3_600 },
+    { key: "history.ref.change_24h", seconds: 86_400 },
   ];
 
   let latest: PythSnapshot;
@@ -69,11 +69,11 @@ export async function collectPythInputs(now: number): Promise<StateInput[]> {
   const ref = `publishTime=${latest.price.publish_time}`;
   const spot = scaled(latest.price);
   const inputs: StateInput[] = [
-    { key: "market.mon_usd.price", value: spot, unit: "USD", source: src, sourceRef: ref, observedAt: now, status: "ok" },
-    { key: "market.mon_usd.conf", value: scaled({ price: latest.price.conf, expo: latest.price.expo }), unit: "USD", source: src, sourceRef: ref, observedAt: now, status: "ok" },
-    { key: "market.mon_usd.ema_price", value: scaled(latest.ema), unit: "USD", source: src, sourceRef: `publishTime=${latest.ema.publish_time}`, observedAt: now, status: "ok" },
+    { key: "market.ref.price", value: spot, unit: "USD", source: src, sourceRef: ref, observedAt: now, status: "ok" },
+    { key: "market.ref.conf", value: scaled({ price: latest.price.conf, expo: latest.price.expo }), unit: "USD", source: src, sourceRef: ref, observedAt: now, status: "ok" },
+    { key: "market.ref.ema_price", value: scaled(latest.ema), unit: "USD", source: src, sourceRef: `publishTime=${latest.ema.publish_time}`, observedAt: now, status: "ok" },
     {
-      key: "market.mon_usd.publish_age",
+      key: "market.ref.publish_age",
       value: now - latest.price.publish_time,
       unit: "s",
       source: src,
@@ -122,7 +122,7 @@ export interface PriceUpdate {
 async function fetchUpdate(path: string): Promise<PriceUpdate> {
   const env = serverEnv();
   if (!env.PYTH_API_KEY) throw new Error("PYTH_API_KEY is not configured; signed price updates are unavailable");
-  const url = `${env.PYTH_HERMES_URL}${path}?ids%5B%5D=${PYTH.monUsdFeedId}&encoding=hex&parsed=true`;
+  const url = `${env.PYTH_HERMES_URL}${path}?ids%5B%5D=${PYTH.feedId}&encoding=hex&parsed=true`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${env.PYTH_API_KEY}` },
     signal: AbortSignal.timeout(8_000),
@@ -136,12 +136,12 @@ async function fetchUpdate(path: string): Promise<PriceUpdate> {
   };
 }
 
-/** Latest signed MON/USD update (for ExecutionVault.execute). */
+/** Latest signed reference-price update (for ExecutionVault.execute). */
 export function latestPriceUpdate(): Promise<PriceUpdate> {
   return fetchUpdate("/v2/updates/price/latest");
 }
 
-/** Signed MON/USD update published at or after `timestamp` (for OutcomeRegistry.resolve). */
+/** Signed update published at `timestamp` — the first at or after it (for OutcomeRegistry.resolve). */
 export function priceUpdateAt(timestamp: number): Promise<PriceUpdate> {
   return fetchUpdate(`/v2/updates/price/${timestamp}`);
 }
@@ -157,12 +157,12 @@ function parsed(s: PythSnapshot): ParsedPrice {
   return { price: s.price.price, conf: s.price.conf, expo: s.price.expo, publishTime: s.price.publish_time };
 }
 
-/** Latest MON/USD price as published by Pyth (signed update, parsed). */
+/** Latest reference price as published by Pyth (signed update, parsed). */
 export async function latestPrice(): Promise<ParsedPrice> {
   return parsed(await fetchPrice("/v2/updates/price/latest"));
 }
 
-/** MON/USD price published at `timestamp` (Pyth's update for that second). */
+/** Reference price published at `timestamp` (Pyth's update for that second). */
 export async function priceAt(timestamp: number): Promise<ParsedPrice> {
   return parsed(await fetchPrice(`/v2/updates/price/${timestamp}`));
 }

@@ -7,9 +7,9 @@
 | Chain | Monad Testnet, id `10143` | verified 2026-09-26 |
 | RPC | `https://testnet-rpc.monad.xyz` | verified |
 | Pyth | `0x2880aB155794e7179c9eE2e38200202908C17B43` (v1.4.6) | verified |
-| MON/USD feed | `0x31491744e2dbf6df7fcf4ac0820d18a609b49076d45066d3568424e62f686cd1` | verified via Hermes |
+| Reference feed ETH/USD | `0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace` | verified via Hermes; the key is not entitled to MON/USD (403) |
 | Hermes | `https://pyth.dourolabs.app/hermes` + `PYTH_API_KEY` (Bearer) | key required since 2026-08-26; old host returns 401 for price updates |
-| Pyth testnet contract accepts post-upgrade update format | — | to verify with a fork test before contract deploy |
+| Pyth testnet contract accepts post-upgrade update format and `parsePriceFeedUpdatesUnique` | — | verified: `web/scripts/fork-pyth.sh` (fork test against the live deployment) |
 | Explorer | `https://testnet.monadexplorer.com` | used for links |
 | Source verification | Sourcify, `https://sourcify-api-monad.blockvision.org` | verified: all four contracts exact match |
 | Faucet | `https://faucet.monad.xyz` | to verify limits |

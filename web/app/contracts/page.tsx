@@ -101,7 +101,7 @@ export default async function ContractsPage() {
                 { k: "Version", v: <Avail value={pyth.version}>{(v) => <span className="font-mono">{v}</span>}</Avail> },
                 { k: "Valid time period", v: <Avail value={pyth.validTimePeriod}>{(v) => `${v} s`}</Avail> },
                 { k: "Feed", v: PYTH.feedSymbol },
-                { k: "Feed id", v: <Hash value={PYTH.monUsdFeedId} /> },
+                { k: "Feed id", v: <Hash value={PYTH.feedId} /> },
               ]}
             />
           </Panel>

@@ -22,7 +22,9 @@ import {IDecisionEngine, IDecisionRegistry, IExecutionVault} from "./interfaces/
 ///      price and (2) the admin-only emergency withdrawal while paused.
 contract ExecutionVault is IExecutionVault, AccessControl, Pausable, ReentrancyGuard {
     uint16 public constant MAX_ACTION_BPS = 2_500;
-    uint64 public constant MAX_PRICE_AGE = 60;
+    /// @dev The start price must be at most this old, which leaves an executor almost no
+    ///      choice between updates (Pyth publishes several per second).
+    uint64 public constant MAX_PRICE_AGE = 10;
 
     IDecisionRegistry public immutable registry;
     IDecisionEngine public immutable engine;

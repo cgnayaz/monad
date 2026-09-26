@@ -66,6 +66,19 @@ export const decisionRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "MAX_LOCK_PER_AGENT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_SUBMISSION_WINDOW",
     "inputs": [],
     "outputs": [
@@ -1207,6 +1220,24 @@ export const decisionRegistryAbi = [
         "name": "agentId",
         "type": "uint16",
         "internalType": "uint16"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "withdrawRewardPool",
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address payable"
       },
       {
         "name": "amount",

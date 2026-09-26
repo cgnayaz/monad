@@ -87,8 +87,14 @@ never reaches this path, and no action takes an address, an amount or calldata f
 
 ## 7. Server input validation
 
-- `POST /api/decisions` ignores the request body entirely; `/advance` takes only a numeric id.
-- One running round per instance and a 30 s minimum interval (HTTP 429 with Retry-After).
+- `POST /api/decisions` accepts only `{mode}` (≤ 256 bytes); `/advance` takes only a numeric id.
+- Live rounds and `/advance` require an operator session: the wallet signs a server challenge
+  (HMAC nonce, 5 min), the server checks `DEFAULT_ADMIN_ROLE` on DecisionRegistry or
+  `GUARDIAN_ROLE` on DecisionEngine on chain, then sets an httpOnly, SameSite=Strict HMAC cookie
+  (30 min, `SESSION_SECRET`). Without it the server keys, bonds and AI credits cannot be spent.
+- One running round per instance and a 30 s minimum interval (HTTP 429 with Retry-After);
+  per-client rate limits on simulation rounds (3 / 10 min), oracle routes and reads.
+- Security headers on every route (CSP, frame-ancestors none, nosniff); see SECURITY_AUDIT.md.
 - The server never accepts a fork, amount, address or calldata from the browser.
 - Guardian decisions are signed by the guardian's own wallet in the browser, not by the server.
 

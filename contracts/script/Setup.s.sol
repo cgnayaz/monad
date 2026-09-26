@@ -13,9 +13,9 @@ import {ExecutionVault} from "../src/ExecutionVault.sol";
 /// Monad prices cold storage higher than the local simulation, so let the RPC estimate gas:
 ///   forge script script/Setup.s.sol --rpc-url monad_testnet --broadcast --slow --skip-simulation
 contract Setup is Script {
-    uint256 internal constant VAULT_RESERVE = 1 ether;
-    uint256 internal constant VAULT_ACTIVE = 1 ether;
-    uint256 internal constant REWARD_POOL = 0.5 ether;
+    uint256 internal constant VAULT_RESERVE = 0.5 ether;
+    uint256 internal constant VAULT_ACTIVE = 0.5 ether;
+    uint256 internal constant REWARD_POOL = 0.3 ether;
     uint256 internal constant AGENT_BOND = 0.5 ether;
     uint256 internal constant AGENT_GAS = 0.2 ether;
     uint256 internal constant PROPOSER_GAS = 0.3 ether;

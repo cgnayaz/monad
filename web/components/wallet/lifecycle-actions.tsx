@@ -88,7 +88,7 @@ export function LifecycleActions({ ctx }: { ctx: LifecycleContext }) {
   const busy = tx.state.phase !== "idle" && tx.state.phase !== "confirmed" && tx.state.phase !== "failed";
 
   const send = async (a: WalletAction) => {
-    const r = await tx.run(a, { resolveAt: t0 !== null ? t0 + 1 : undefined });
+    const r = await tx.run(a, { resolveAt: t0 ?? undefined });
     if (r) router.refresh(); // re-read the decision from chain
   };
 

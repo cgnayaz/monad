@@ -35,6 +35,8 @@ contract DecisionRegistry is IDecisionRegistry, AccessControl, Pausable, Reentra
     uint16 public constant MAX_BAND_BPS = 1_000;
     uint16 public constant MIN_THRESHOLD_BPS = 5_001;
     uint8 public constant MIN_QUORUM = 3;
+    /// @dev Bounds how much of an agent's bond a single decision can put at risk.
+    uint256 public constant MAX_LOCK_PER_AGENT = 1 ether;
 
     // ─── Errors ────────────────────────────────────────────────────────────
     error InvalidTransition(Status from, Status to);
@@ -155,6 +157,18 @@ contract DecisionRegistry is IDecisionRegistry, AccessControl, Pausable, Reentra
         if (msg.value == 0) revert ZeroAmount();
         rewardPool += msg.value;
         emit RewardPoolChanged(int256(msg.value), rewardPool);
+    }
+
+    /// @notice Recover unreserved reward-pool funds, only while paused (e.g. to migrate a
+    ///         deployment). Reserved round rewards and agent bonds are never touched.
+    function withdrawRewardPool(address payable to, uint256 amount) external nonReentrant onlyRole(DEFAULT_ADMIN_ROLE) whenPaused {
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (amount > rewardPool) revert InvalidSettlement("reward pool");
+        rewardPool -= amount;
+        emit RewardPoolChanged(-int256(amount), rewardPool);
+        (bool ok,) = to.call{value: amount}("");
+        if (!ok) revert TransferFailed();
     }
 
     function setRoundReward(uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -413,7 +427,7 @@ contract DecisionRegistry is IDecisionRegistry, AccessControl, Pausable, Reentra
             revert InvalidConfig("allowedForks");
         }
         if (c.questionCount == 0 || c.questionCount > DecConstants.MAX_QUESTIONS) revert InvalidConfig("questionCount");
-        if (c.lockPerAgent == 0) revert InvalidConfig("lockPerAgent");
+        if (c.lockPerAgent == 0 || c.lockPerAgent > MAX_LOCK_PER_AGENT) revert InvalidConfig("lockPerAgent");
     }
 
     function _releaseAll(Decision storage d) private {

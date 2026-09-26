@@ -44,7 +44,12 @@ const wallet = (k: Hex) => createWalletClient({ account: privateKeyToAccount(k),
 const PRICE = { type: "tuple", components: [{ type: "int64" }, { type: "uint64" }, { type: "int32" }, { type: "uint256" }] } as const;
 function mockUpdate(price: bigint, publishTime: number): Hex {
   const p = [price, 10n, -8, BigInt(publishTime)] as const;
-  return encodeAbiParameters([{ type: "tuple", components: [{ type: "bytes32" }, PRICE, PRICE] }], [[PYTH.monUsdFeedId, p, p]]);
+  return encodeAbiParameters([{ type: "tuple", components: [{ type: "bytes32" }, PRICE, PRICE] }], [[PYTH.feedId, p, p]]);
+}
+/** MockPythUnique's unique-update encoding: (PriceFeed, prevPublishTime). */
+function mockUniqueUpdate(price: bigint, publishTime: number): Hex {
+  const p = [price, 10n, -8, BigInt(publishTime)] as const;
+  return encodeAbiParameters([{ type: "tuple", components: [{ type: "bytes32" }, PRICE, PRICE] }, { type: "uint64" }], [[PYTH.feedId, p, p], BigInt(publishTime - 1)]);
 }
 
 const endPrice = 99_000_000n; // −1 % after the horizon
@@ -53,11 +58,11 @@ const prices = {
     const t = Number((await test.getBlock()).timestamp);
     return { data: [mockUpdate(100_000_000n, t)], publishTime: t };
   },
-  at: async (ts: number) => ({ data: [mockUpdate(endPrice, ts)], publishTime: ts }),
+  at: async (ts: number) => ({ data: [mockUniqueUpdate(endPrice, ts)], publishTime: ts }),
 };
 
 beforeAll(async () => {
-  const mock = JSON.parse(readFileSync(join(__dirname, "../../../contracts/out/MockPyth.sol/MockPyth.json"), "utf8"));
+  const mock = JSON.parse(readFileSync(join(__dirname, "../../../contracts/out/MockPythUnique.sol/MockPythUnique.json"), "utf8"));
   await test.setCode({ address: PYTH.contract, bytecode: mock.deployedBytecode.object });
 
   const admin = wallet(KEYS.deployer);
@@ -80,10 +85,10 @@ describe("ChainExecutionLayer on the real contracts", () => {
     );
     const now = Number((await test.getBlock()).timestamp);
     const state = buildState(
-      { vault: addr.ExecutionVault, asset: "MON", referenceFeed: "MON/USD", horizonSec: 180, bandBps: 10 },
+      { vault: addr.ExecutionVault, asset: "MON", referenceFeed: "ETH/USD", horizonSec: 180, bandBps: 10 },
       [
-        { key: "market.mon_usd.price", value: 1, unit: "USD", source: "pyth-hermes", observedAt: now, status: "ok" },
-        { key: "history.mon_usd.change_1h", value: -40, unit: "bps", source: "pyth-hermes", observedAt: now, status: "ok" },
+        { key: "market.ref.price", value: 1, unit: "USD", source: "pyth-hermes", observedAt: now, status: "ok" },
+        { key: "history.ref.change_1h", value: -40, unit: "bps", source: "pyth-hermes", observedAt: now, status: "ok" },
         { key: "network.block_number", value: "1", source: "monad-rpc", observedAt: now, status: "ok" },
       ],
       now,

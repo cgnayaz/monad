@@ -19,7 +19,9 @@ import {OutcomeRegistry} from "../src/OutcomeRegistry.sol";
 contract Deploy is Script {
     // Verified on Monad Testnet 2026-09-26 (ARCHITECTURE.md §6).
     IPyth internal constant PYTH = IPyth(0x2880aB155794e7179c9eE2e38200202908C17B43);
-    bytes32 internal constant MON_USD = 0x31491744e2dbf6df7fcf4ac0820d18a609b49076d45066d3568424e62f686cd1;
+    // Reference feed: ETH/USD (MON/USD is not included in the configured Hermes plan).
+    // Must match web/lib/config/public.ts PYTH.feedId.
+    bytes32 internal constant REFERENCE_FEED = 0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace;
 
     // CONTRACT_SPEC.md §8 defaults.
     uint16 internal constant ACTION_BPS = 1_000;
@@ -40,8 +42,8 @@ contract Deploy is Script {
         vm.startBroadcast(pk);
         DecisionRegistry registry = new DecisionRegistry(admin);
         DecisionEngine engine = new DecisionEngine(admin, registry);
-        ExecutionVault vault = new ExecutionVault(admin, registry, engine, PYTH, MON_USD, ACTION_BPS, MAX_MOVE, COOLDOWN);
-        OutcomeRegistry outcome = new OutcomeRegistry(admin, registry, vault, PYTH, MON_USD, SLASH_BPS, MISS_PENALTY_BPS);
+        ExecutionVault vault = new ExecutionVault(admin, registry, engine, PYTH, REFERENCE_FEED, ACTION_BPS, MAX_MOVE, COOLDOWN);
+        OutcomeRegistry outcome = new OutcomeRegistry(admin, registry, vault, PYTH, REFERENCE_FEED, SLASH_BPS, MISS_PENALTY_BPS);
 
         registry.grantRole(registry.ENGINE_ROLE(), address(engine));
         registry.grantRole(registry.VAULT_ROLE(), address(vault));

@@ -6,7 +6,7 @@
 type Layer = "Jev" | "DecMarkt" | "Monad";
 
 export const PIPELINE: { stage: string; layer: Layer; where: string; detail: string }[] = [
-  { stage: "Real state", layer: "Jev", where: "collectors", detail: "Pyth MON/USD, Monad RPC, vault and registry views." },
+  { stage: "Real state", layer: "Jev", where: "collectors", detail: "Pyth reference price (ETH/USD), Monad RPC, vault and registry views." },
   { stage: "Jev state", layer: "Jev", where: "lib/jev/state", detail: "Canonical JSON (RFC 8785), versioned, every input sourced; keccak256 → stateHash." },
   { stage: "Jev questions", layer: "Jev", where: "lib/jev/questions", detail: "Six explicit questions with rubrics; keccak256 → questionsHash." },
   { stage: "Commit", layer: "Monad", where: "DecisionRegistry", detail: "stateHash and questionsHash written on-chain before any agent runs." },
@@ -17,7 +17,7 @@ export const PIPELINE: { stage: string; layer: Layer; where: string; detail: str
   { stage: "Decision engine", layer: "DecMarkt", where: "DecisionEngine.aggregate", detail: "Integer aggregation: probability × track record per fork." },
   { stage: "Threshold", layer: "DecMarkt", where: "DecisionEngine", detail: "Quorum, winning share and minimum score gates; failure → NO_ACTION." },
   { stage: "Bounded action", layer: "Monad", where: "ExecutionVault.execute", detail: "Only the approved fork runs. No external calls, no AI calldata." },
-  { stage: "Real outcome", layer: "Monad", where: "Pyth", detail: "Signed MON/USD price at execution and after the horizon." },
+  { stage: "Real outcome", layer: "Monad", where: "Pyth", detail: "Signed Pyth price at execution and after the horizon." },
   { stage: "Verify", layer: "Monad", where: "OutcomeRegistry.resolve", detail: "Publish-time window enforced; correct fork derived from the move." },
   { stage: "Reward / penalty", layer: "DecMarkt", where: "OutcomeRegistry", detail: "Deterministic settlement of every bond. Agents have no input." },
 ];

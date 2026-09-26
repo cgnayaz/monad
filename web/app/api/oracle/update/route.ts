@@ -1,5 +1,7 @@
 import { latestPriceUpdate, priceUpdateAt } from "@/lib/collectors/pyth";
 
+import { clientKey, rateLimit, tooMany } from "@/lib/server/rate-limit";
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -8,6 +10,8 @@ export const dynamic = "force-dynamic";
  * contracts verify the signature and the publish-time window; this route only relays it.
  */
 export async function GET(req: Request) {
+  const rl = rateLimit(`oracle-update:${clientKey(req)}`, 20, 60_000);
+  if (!rl.ok) return tooMany(rl.retryAfterSec);
   const at = new URL(req.url).searchParams.get("at");
   if (at !== null && !/^\d{9,11}$/.test(at)) return Response.json({ error: "Invalid timestamp" }, { status: 400 });
   try {

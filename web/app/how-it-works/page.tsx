@@ -97,7 +97,7 @@ export default function HowItWorksPage() {
 
       <Section
         title="What is being decided"
-        description="An on-chain vault holds test MON in two buckets, ACTIVE and RESERVE. Each round decides whether to move part of it for the next horizon. The correct answer is defined by the MON/USD move measured from signed Pyth prices — never by opinion."
+        description="An on-chain vault holds test MON in two buckets, ACTIVE and RESERVE. Each round decides whether to move part of it for the next horizon. The correct answer is defined by the reference-market move (ETH/USD) measured from signed Pyth prices — never by opinion."
       >
         <ForkTable />
       </Section>

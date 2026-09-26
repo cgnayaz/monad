@@ -15,11 +15,11 @@ import { buildOutcome, checkQuestionSet, checkState, correctFork, moveBps, obser
 
 const NOW = 1_790_000_000;
 const inputs: StateInput[] = [
-  { key: "market.mon_usd.price", value: 0.0421, unit: "USD", source: "pyth-hermes", observedAt: NOW, status: "ok" },
+  { key: "market.ref.price", value: 0.0421, unit: "USD", source: "pyth-hermes", observedAt: NOW, status: "ok" },
   { key: "network.block_number", value: "123", source: "monad-rpc", observedAt: NOW, status: "ok" },
   { key: "vault.active", value: null, unit: "MON", source: "execution-vault", observedAt: NOW, status: "unavailable", note: "contracts not deployed" },
 ];
-const subject = { vault: null, asset: "MON", referenceFeed: "MON/USD", horizonSec: 180, bandBps: 10 } as const;
+const subject = { vault: null, asset: "MON", referenceFeed: "ETH/USD", horizonSec: 180, bandBps: 10 } as const;
 const BOND = 50_000_000_000_000_000n;
 
 describe("Jev State", () => {
@@ -93,7 +93,7 @@ describe("Model output validation", () => {
   const state = buildState(subject, inputs, NOW);
   const set = buildQuestionSet(state, NOW);
   const assigned = assignedQuestions(set, "RISK");
-  const answer = (questionIndex: number, evidence = ["market.mon_usd.price"]) => ({
+  const answer = (questionIndex: number, evidence = ["market.ref.price"]) => ({
     questionIndex,
     choice: "NO_ACTION",
     probability: 5500,

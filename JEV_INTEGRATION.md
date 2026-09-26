@@ -44,7 +44,7 @@ interface StateRecord {              // web/lib/model/state.ts
   hash: Hex;                         // committed on-chain as Decision.stateHash
 }
 interface StateInput {
-  key: string;                       // e.g. "market.mon_usd.price"
+  key: string;                       // e.g. "market.ref.price"
   value: string | number | null;     // null ⇔ unavailable
   unit?: string;
   source: "pyth-hermes" | "monad-rpc" | "decision-registry" | "execution-vault";
@@ -59,8 +59,8 @@ Inputs in v1 (all real, fetched at collection time):
 
 | Group | Keys | Source |
 |---|---|---|
-| Market | `mon_usd.price`, `.conf`, `.publishTime`, `.ema_price` | Pyth Hermes latest |
-| History | `mon_usd.change_5m/1h/24h`, realized volatility | Pyth Hermes historical (to verify endpoint limits; marked unavailable if not served) |
+| Market | `ref.price`, `.conf`, `.publishTime`, `.ema_price` (reference feed ETH/USD) | Pyth Hermes latest |
+| History | `ref.change_5m/1h/24h`, realized volatility | Pyth Hermes historical (to verify endpoint limits; marked unavailable if not served) |
 | Network | latest block, avg block interval (last N), gas price | Monad RPC |
 | Vault | ACTIVE / RESERVE balances, last action, cooldown remaining | `ExecutionVault` views |
 | Track record | past decisions' correct forks, per-agent accuracy | `DecisionRegistry` / `OutcomeRegistry` views |

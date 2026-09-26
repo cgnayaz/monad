@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { SESSION_COOKIE, operatorFromCookie } from "@/lib/server/operator-session";
 import { chainExecutionLayer } from "@/lib/engine/runtime";
 import { toWireJson } from "@/lib/engine/wire";
 
@@ -9,10 +11,15 @@ export const maxDuration = 120;
  * POST /api/decisions/:id/advance — perform the next permissionless lifecycle step that is
  * due (aggregate after the deadline, finalise a timed-out escalation, execute the approved
  * action, resolve the outcome). The step is chosen from on-chain state, not from the caller.
+ * The keeper pays gas and oracle fees, so this requires an operator session. (Every step is
+ * also available to any wallet directly on the decision page.)
  */
 export async function POST(_req: NextRequest, ctx: RouteContext<"/api/decisions/[id]/advance">) {
   const { id } = await ctx.params;
   if (!/^[1-9]\d{0,30}$/.test(id)) return Response.json({ error: "Invalid decision id" }, { status: 400 });
+  if (!operatorFromCookie((await cookies()).get(SESSION_COOKIE)?.value)) {
+    return Response.json({ error: "Keeper steps require an operator session" }, { status: 401 });
+  }
   const chain = chainExecutionLayer();
   if (!chain.layer) return Response.json({ error: chain.reason }, { status: 503 });
   try {

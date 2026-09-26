@@ -32,7 +32,7 @@ const StateBody = z
           .object({
             vault: address.nullable(),
             asset: z.literal("MON"),
-            referenceFeed: z.literal("MON/USD"),
+            referenceFeed: z.string().regex(/^[A-Z0-9]{2,10}\/USD$/),
             horizonSec: z.number().int().positive(),
             bandBps: z.number().int().min(0).max(1000),
           })

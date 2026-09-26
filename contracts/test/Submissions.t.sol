@@ -205,6 +205,22 @@ contract AccessControlTest is Base {
         registry.createDecision(keccak256("p"), keccak256("q"), c);
     }
 
+    function test_RewardPoolWithdrawalOnlyAdminWhilePaused() public {
+        vm.prank(admin);
+        vm.expectRevert();
+        registry.withdrawRewardPool(payable(admin), 0.1 ether); // not paused
+        vm.prank(stranger);
+        vm.expectRevert();
+        registry.withdrawRewardPool(payable(stranger), 0.1 ether); // not admin
+        vm.startPrank(admin);
+        registry.pause();
+        registry.withdrawRewardPool(payable(admin), 0.4 ether);
+        vm.stopPrank();
+        assertEq(registry.rewardPool(), POOL - 0.4 ether);
+        assertEq(admin.balance, 0.4 ether);
+        _assertRegistrySolvent();
+    }
+
     function test_VaultRejectsDirectTransfers() public {
         (bool ok,) = address(vault).call{value: 1}("");
         assertFalse(ok);

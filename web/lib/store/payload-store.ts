@@ -2,6 +2,7 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { get, put } from "@vercel/blob";
+import { contractAddress } from "@/lib/chain/deployments";
 import { toWireJson } from "@/lib/engine/wire";
 import type { AgentRun } from "@/lib/model/decision";
 import type { DecisionId } from "@/lib/model/primitives";
@@ -67,8 +68,9 @@ export class PayloadStore {
   putQuestions(set: QuestionSet) {
     return this.backend.put(`questions/${set.hash}.json`, toWireJson(set));
   }
+  /** Runs are keyed by registry address too: decision ids restart at 1 on a new deployment. */
   putRun(run: AgentRun) {
-    return this.backend.put(`runs/${run.decisionId}/${run.agentId}.json`, toWireJson(run));
+    return this.backend.put(`runs/${registryKey()}/${run.decisionId}/${run.agentId}.json`, toWireJson(run));
   }
 
   async getState(hash: Hex): Promise<unknown | null> {
@@ -78,8 +80,12 @@ export class PayloadStore {
     return parse(await this.backend.get(`questions/${hash}.json`));
   }
   async getRun(decisionId: DecisionId, agentId: number): Promise<unknown | null> {
-    return parse(await this.backend.get(`runs/${decisionId}/${agentId}.json`));
+    return parse(await this.backend.get(`runs/${registryKey()}/${decisionId}/${agentId}.json`));
   }
+}
+
+function registryKey(): string {
+  return (contractAddress("DecisionRegistry") ?? "undeployed").toLowerCase();
 }
 
 function parse(text: string | null): unknown | null {

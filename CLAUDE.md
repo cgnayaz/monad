@@ -14,7 +14,7 @@ Mükemmel kod değil, **çalışan ve etkileyici demo** önemli. Her 1-2 saatte 
 - **Frontend:** Next.js (App Router) + TypeScript + Tailwind + wagmi + viem (`web/`, cüzdan için injected connector; RainbowKit yok)
 - **AI:** sunucu tarafı provider soyutlaması (`web/lib/ai/`), 5 bağımsız analist; pipeline `web/lib/engine/`, API `web/app/api/decisions/` (NDJSON akışı + `/[id]/advance`); uçtan uca test `web/scripts/integration.sh` (anvil)
 - **Kalite:** `cd web && npm run check` (typegen+tsc, eslint, vitest, build) — commit öncesi yeşil olmalı
-- **Oracle:** Pyth (Hermes API anahtarı gerekli: `PYTH_API_KEY`) (Monad testnet `0x2880aB155794e7179c9eE2e38200202908C17B43`, MON/USD)
+- **Oracle:** Pyth (Hermes API anahtarı gerekli: `PYTH_API_KEY`) (Monad testnet `0x2880aB155794e7179c9eE2e38200202908C17B43`, ETH/USD — anahtar yalnızca ETH/USD'ye yetkili)
 - Agent kodu yazarken önce `claude-api` skill'ini yükle; model adlarını ezberden yazma.
 
 ## Monad bilgileri (etkinlikte doğrula!)

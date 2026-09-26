@@ -41,7 +41,11 @@ const wallet = (k: Hex) => createWalletClient({ account: privateKeyToAccount(k),
 const P = { type: "tuple", components: [{ type: "int64" }, { type: "uint64" }, { type: "int32" }, { type: "uint256" }] } as const;
 const update = (price: bigint, t: number): Hex => {
   const p = [price, 12_000n, -8, BigInt(t)] as const;
-  return encodeAbiParameters([{ type: "tuple", components: [{ type: "bytes32" }, P, P] }], [[PYTH.monUsdFeedId, p, p]]);
+  return encodeAbiParameters([{ type: "tuple", components: [{ type: "bytes32" }, P, P] }], [[PYTH.feedId, p, p]]);
+};
+const uniqueUpdate = (price: bigint, t: number): Hex => {
+  const p = [price, 12_000n, -8, BigInt(t)] as const;
+  return encodeAbiParameters([{ type: "tuple", components: [{ type: "bytes32" }, P, P] }, { type: "uint64" }], [[PYTH.feedId, p, p], BigInt(t - 1)]);
 };
 let end = 3_458_000n;
 const prices = {
@@ -49,11 +53,11 @@ const prices = {
     const t = Number((await chain.getBlock()).timestamp);
     return { data: [update(3_471_000n, t)], publishTime: t };
   },
-  at: async (t: number) => ({ data: [update(end, t)], publishTime: t }),
+  at: async (t: number) => ({ data: [uniqueUpdate(end, t)], publishTime: t }),
 };
 
 it("seeds a local chain with real rounds", async () => {
-  const mock = JSON.parse(readFileSync(join(__dirname, "../../contracts/out/MockPyth.sol/MockPyth.json"), "utf8"));
+  const mock = JSON.parse(readFileSync(join(__dirname, "../../contracts/out/MockPythUnique.sol/MockPythUnique.json"), "utf8"));
   await chain.setCode({ address: PYTH.contract, bytecode: mock.deployedBytecode.object });
   const admin = wallet(K.deployer);
   const send = async (h: Promise<Hex>) => chain.waitForTransactionReceipt({ hash: await h });

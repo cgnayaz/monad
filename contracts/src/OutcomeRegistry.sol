@@ -17,6 +17,7 @@ import {
     Submission
 } from "./lib/DecTypes.sol";
 import {IDecisionRegistry, IExecutionVault} from "./interfaces/IDecMarkt.sol";
+import {IPythUnique} from "./interfaces/IPythUnique.sol";
 
 /// @title OutcomeRegistry
 /// @notice Verifies the real outcome of an executed decision from a signed Pyth price,
@@ -24,7 +25,8 @@ import {IDecisionRegistry, IExecutionVault} from "./interfaces/IDecMarkt.sol";
 ///
 /// Outcome (JEV_INTEGRATION.md §11):
 ///   t0           = executedAt + horizon
-///   end price    = Pyth update with publishTime ∈ [t0, t0 + RESOLUTION_TOLERANCE]
+///   end price    = the FIRST Pyth update at or after t0 (parsePriceFeedUpdatesUnique), and
+///                  published no later than t0 + RESOLUTION_TOLERANCE — no caller can pick a price
 ///   outcomeValue = (end − start) × 10000 / start                         (bps, int)
 ///   observed     = outcomeValue < −band ? ACTION_A : outcomeValue > band ? ACTION_B : NO_ACTION
 ///   success      = expectedAction == observed
@@ -38,7 +40,8 @@ import {IDecisionRegistry, IExecutionVault} from "./interfaces/IDecMarkt.sol";
 ///   Every lock is released; penalties are deducted from it.
 contract OutcomeRegistry is AccessControl, ReentrancyGuard {
     uint64 public constant RESOLUTION_TOLERANCE = 60;
-    uint64 public constant VOID_GRACE = 300;
+    /// @dev Long enough that an honest keeper always resolves before a losing party could void.
+    uint64 public constant VOID_GRACE = 1 hours;
     uint16 public constant MAX_SLASH_BPS = 5_000;
     uint16 public constant MAX_MISS_PENALTY_BPS = 2_000;
 
@@ -105,7 +108,9 @@ contract OutcomeRegistry is AccessControl, ReentrancyGuard {
 
         bytes32[] memory ids = new bytes32[](1);
         ids[0] = priceId;
-        PythStructs.PriceFeed[] memory feeds = pyth.parsePriceFeedUpdates{value: fee}(pythUpdate, ids, t0, t0 + RESOLUTION_TOLERANCE);
+        // The first update at/after t0 is the only acceptable one: prevPublishTime < t0 <= publishTime.
+        PythStructs.PriceFeed[] memory feeds =
+            IPythUnique(address(pyth)).parsePriceFeedUpdatesUnique{value: fee}(pythUpdate, ids, t0, t0 + RESOLUTION_TOLERANCE);
         PythStructs.Price memory p = feeds[0].price;
         if (p.price <= 0) revert InvalidPrice();
         if (p.expo != e.expo) revert ExpoMismatch(e.expo, p.expo);

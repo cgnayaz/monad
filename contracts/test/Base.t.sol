@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {MockPyth} from "@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
+import {MockPythUnique} from "./mocks/MockPythUnique.sol";
 import {DecisionRegistry} from "../src/DecisionRegistry.sol";
 import {DecisionEngine} from "../src/DecisionEngine.sol";
 import {ExecutionVault} from "../src/ExecutionVault.sol";
@@ -20,7 +20,7 @@ abstract contract Base is Test {
     int64 internal constant START_PRICE = 100_000_000; // 1.00000000 with expo −8
     uint256 internal constant T0 = 1_790_000_000;
 
-    MockPyth internal pyth;
+    MockPythUnique internal pyth;
     DecisionRegistry internal registry;
     DecisionEngine internal engine;
     ExecutionVault internal vault;
@@ -37,7 +37,7 @@ abstract contract Base is Test {
 
     function setUp() public virtual {
         vm.warp(T0);
-        pyth = new MockPyth(60, FEE);
+        pyth = new MockPythUnique(60, FEE);
 
         vm.startPrank(admin);
         registry = new DecisionRegistry(admin);
@@ -121,13 +121,19 @@ abstract contract Base is Test {
         vault.execute{value: FEE}(id, _update(START_PRICE, block.timestamp));
     }
 
-    /// @dev Warp to the resolution window and resolve with `endPrice` published at t0 + 1.
+    /// @dev A unique update: published at `publishTime`, previous update at `prev`.
+    function _unique(int64 price, uint256 publishTime, uint256 prev) internal view returns (bytes[] memory u) {
+        u = new bytes[](1);
+        u[0] = pyth.createUniqueUpdateData(PRICE_ID, price, -8, uint64(publishTime), uint64(prev));
+    }
+
+    /// @dev Warp to the resolution window and resolve with the first update after t0 (published t0 + 1).
     function _resolve(uint256 id, int64 endPrice) internal {
         Execution memory e = vault.getExecution(id);
         uint256 t0 = e.executedAt + _cfg().horizon;
         vm.warp(t0 + 1);
         vm.prank(keeper);
-        outcome.resolve{value: FEE}(id, _update(endPrice, t0 + 1));
+        outcome.resolve{value: FEE}(id, _unique(endPrice, t0 + 1, t0 - 1));
     }
 
     function _status(uint256 id) internal view returns (Status) {

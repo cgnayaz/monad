@@ -52,7 +52,9 @@ export function readiness(): Readiness {
       ? { ok: false, reason: r.contracts.detail }
       : !r.signers.ok
         ? { ok: false, reason: r.signers.detail }
-        : { ok: true, reason: r.oracle.ok ? "Every stage is a Monad Testnet transaction." : "Runs to approval; execution needs PYTH_API_KEY for a signed price." };
+        : !process.env.SESSION_SECRET
+          ? { ok: false, reason: "SESSION_SECRET not configured (operator sign-in)" }
+          : { ok: true, reason: r.oracle.ok ? "Every stage is a Monad Testnet transaction. Requires operator sign-in." : "Runs to approval; execution needs PYTH_API_KEY for a signed price." };
   const mode = live.ok ? "live" : simulation.ok ? "simulation" : "unavailable";
   const modeDetail = mode === "live" ? live.reason : mode === "simulation" ? simulation.reason : "No AI provider is configured, so no agent can evaluate. Nothing is simulated.";
   return { ...r, ready, mode, modeDetail, modes: { simulation, live } };

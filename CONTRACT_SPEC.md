@@ -175,7 +175,7 @@ receive() external payable;                   // always reverts (no untracked fu
 
 `execute`: status == APPROVED · cooldown elapsed · `msg.value == pyth.getUpdateFee(update)`
 (exact, so no refund transfer is needed) · action read from `engine.approvedAction(id)` ·
-start price from `pyth.parsePriceFeedUpdates(update, [MON/USD], now − 60, now)`, price > 0 ·
+start price from `pyth.parsePriceFeedUpdates(update, [ETH/USD], now − 10, now)` (`MAX_PRICE_AGE` = 10 s), price > 0 ·
 then exactly one branch:
 
 | Choice | Effect |
@@ -206,14 +206,16 @@ observed move makes correct), `success`, `outcomeValue` (move in bps), `startPri
 
 ```
 t0           = executedAt + horizon;  resolve allowed when now ≥ t0
-end price    = parsePriceFeedUpdates(update, [MON/USD], t0, t0 + 60)   (else Pyth reverts)
+end price    = parsePriceFeedUpdatesUnique(update, [ETH/USD], t0, t0 + 60)
+               (only the FIRST update published at or after t0 is accepted: prevPublishTime < t0;
+                a later update inside the window reverts, so the price cannot be cherry-picked)
 expo must equal the start expo (ExpoMismatch)
 outcomeValue = (end − start) × 10000 / start
 observed     = outcomeValue < −band ? ACTION_A : outcomeValue > band ? ACTION_B : NO_ACTION
 success      = expectedAction == observed
 ```
 
-`voidOutcome` after `t0 + 60 + 300` without a resolution: `isVoid = true`, every lock
+`voidOutcome` after `t0 + 60 + 3600` (`VOID_GRACE` = 1 h) without a resolution: `isVoid = true`, every lock
 returned, round reward back to the pool, status RESOLVED.
 
 ## 8. Parameters (demo defaults; admin-settable within caps)
@@ -227,14 +229,14 @@ returned, round reward back to the pool, status RESOLVED.
 | `minActionScore` | 5500 | 10000 | per decision |
 | `quorum` | 4 of 5 | 3–16 | per decision |
 | `questionCount` | 6 | 16 | per decision |
-| `lockPerAgent` | 0.05 MON | > 0 | per decision |
+| `lockPerAgent` | 0.05 MON | `MAX_LOCK_PER_AGENT` = 1 MON | per decision |
 | `roundReward` | 0.02 MON | pool balance | registry |
 | `slashBps` | 3000 | 5000 | OutcomeRegistry |
 | `missPenaltyBps` | 1000 | 2000 | OutcomeRegistry |
 | `actionBps` / `maxMove` / `cooldown` | 1000 / 0.5 MON / 0 | 2500 / — / — | ExecutionVault |
 | `GUARDIAN_WINDOW` | 120 s | constant | DecisionEngine |
-| `RESOLUTION_TOLERANCE` / `VOID_GRACE` | 60 s / 300 s | constant | OutcomeRegistry |
-| `MAX_PRICE_AGE` (start price) | 60 s | constant | ExecutionVault |
+| `RESOLUTION_TOLERANCE` / `VOID_GRACE` | 60 s / 1 h | constant | OutcomeRegistry |
+| `MAX_PRICE_AGE` (start price) | 10 s | constant | ExecutionVault |
 
 ## 9. Aggregation
 

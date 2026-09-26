@@ -43,7 +43,7 @@ export function userPrompt(req: EvaluationRequest): string {
     "Bounded forks:",
     forks,
     "",
-    `Verification rule: over a horizon of ${req.horizonSec} s after execution, the MON/USD move is measured from signed Pyth prices. ` +
+    `Verification rule: over a horizon of ${req.horizonSec} s after execution, the ${req.state.subject.referenceFeed} move is measured from signed Pyth prices. ` +
       `A fall of more than ${req.bandBps} bps makes DERISK correct, a rise of more than ${req.bandBps} bps makes DEPLOY correct, otherwise NO_ACTION is correct. ESCALATE is neutral.`,
     "",
     "Questions to answer (answer every one and no others; refer to each by its questionIndex):",

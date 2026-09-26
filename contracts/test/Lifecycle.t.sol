@@ -238,6 +238,11 @@ contract InvalidTransitionTest is Base {
         registry.createDecision(keccak256("c"), q, _withForks(0x1F)); // unknown bit
         _expectConfig("quorum");
         registry.createDecision(keccak256("d"), q, _withQuorum(2));
+        // Security audit L-2: a single decision cannot lock more than MAX_LOCK_PER_AGENT.
+        DecisionConfig memory big = _cfg();
+        big.lockPerAgent = 1 ether + 1;
+        _expectConfig("lockPerAgent");
+        registry.createDecision(keccak256("e"), q, big);
         vm.stopPrank();
     }
 

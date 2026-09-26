@@ -20,6 +20,7 @@ import {
   StateStep,
   VerifyStep,
 } from "./step-content";
+import { OperatorSessionBar, useOperatorSession } from "@/components/wallet/operator-session";
 import { STEPS, useDemo, type DemoMode, type StepKey, type StepStatus } from "./use-demo";
 
 interface ModeAvailability {
@@ -45,6 +46,8 @@ const tone: Record<StepStatus, Tone> = { pending: "neutral", active: "wait", don
 
 export function Demo({ modes, idle, allowedForks }: { modes: Record<DemoMode, ModeAvailability>; idle: DecisionView; allowedForks: string[] }) {
   const d = useDemo();
+  const session = useOperatorSession();
+  const needsOperator = d.mode === "live" && !session.operator;
   const started = d.startedAt !== null;
   const v = started ? d.view : idle;
   const current = STEPS.find((k) => d.steps[k].status === "active" || d.steps[k].status === "failed");
@@ -109,7 +112,8 @@ export function Demo({ modes, idle, allowedForks }: { modes: Record<DemoMode, Mo
           })}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule px-4 py-3">
-          <Button onClick={d.start} disabled={!modes[d.mode].ok || d.running}>
+          {d.mode === "live" && <OperatorSessionBar session={session} />}
+          <Button onClick={d.start} disabled={!modes[d.mode].ok || d.running || needsOperator}>
             {d.running ? "Running…" : started ? "Run again" : d.mode === "live" ? "Start live round" : "Start simulation"}
           </Button>
           {failed && !d.running && (

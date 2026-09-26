@@ -11,11 +11,16 @@ export const MONAD_TESTNET = {
   nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
 } as const;
 
-/** Pyth — verified on Monad Testnet on 2026-09-26 (ARCHITECTURE.md §6). */
+/**
+ * Pyth — contract verified on Monad Testnet on 2026-09-26 (ARCHITECTURE.md §6).
+ * Reference feed: ETH/USD. MON/USD exists on Pyth but is not included in the configured
+ * Hermes plan ("not entitled"), so the outcome reference is ETH/USD. The feed is fixed in
+ * ExecutionVault and OutcomeRegistry at deployment; this constant must match it.
+ */
 export const PYTH = {
   contract: "0x2880aB155794e7179c9eE2e38200202908C17B43",
-  monUsdFeedId: "0x31491744e2dbf6df7fcf4ac0820d18a609b49076d45066d3568424e62f686cd1",
-  feedSymbol: "MON/USD",
+  feedId: "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
+  feedSymbol: "ETH/USD",
 } as const;
 
 export const REPO_URL = "https://github.com/cgnayaz/monad";

@@ -32,9 +32,9 @@ async function simulationRound() {
   const d = await runDecisionPipeline({
     collectState: async () =>
       buildState(
-        { vault: null, asset: "MON", referenceFeed: "MON/USD", horizonSec: 60, bandBps: 10 },
+        { vault: null, asset: "MON", referenceFeed: "ETH/USD", horizonSec: 60, bandBps: 10 },
         [
-          { key: "market.mon_usd.price", value: 0.0347, unit: "USD", source: "pyth-hermes", observedAt: NOW, status: "ok" },
+          { key: "market.ref.price", value: 0.0347, unit: "USD", source: "pyth-hermes", observedAt: NOW, status: "ok" },
           { key: "network.block_number", value: "100", source: "monad-rpc", observedAt: NOW, status: "ok" },
         ],
         NOW,

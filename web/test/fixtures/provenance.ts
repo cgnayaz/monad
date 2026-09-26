@@ -19,8 +19,8 @@ const TX = (n: number) => ({ chainId: 10143, hash: `0x${n.toString(16).padStart(
 /** Build a complete provenance end to end from Jev and DecMarkt functions (no chain). */
 export function provenanceFixture(): DecisionProvenance {
   const state = buildState(
-    { vault: null, asset: "MON", referenceFeed: "MON/USD", horizonSec: 180, bandBps: 10 },
-    [{ key: "market.mon_usd.price", value: 0.0421, source: "pyth-hermes", observedAt: NOW, status: "ok" }],
+    { vault: null, asset: "MON", referenceFeed: "ETH/USD", horizonSec: 180, bandBps: 10 },
+    [{ key: "market.ref.price", value: 0.0421, source: "pyth-hermes", observedAt: NOW, status: "ok" }],
     NOW,
   );
   const questions = buildQuestionSet(state, NOW);
@@ -33,7 +33,7 @@ export function provenanceFixture(): DecisionProvenance {
           questionIndex: q.index,
           choice: a.key === "YIELD" ? "NO_ACTION" : "DERISK",
           probability: 7000,
-          factors: q.rubric.map((f) => ({ factor: f.factor, rating: 3 as const, evidence: ["market.mon_usd.price"] })),
+          factors: q.rubric.map((f) => ({ factor: f.factor, rating: 3 as const, evidence: ["market.ref.price"] })),
           reason: "Downside move expected beyond the band within the horizon.",
         }),
       );

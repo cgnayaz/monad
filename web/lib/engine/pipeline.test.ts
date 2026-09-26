@@ -27,11 +27,11 @@ const PARAMS = {
 const state = () =>
   Promise.resolve(
     buildState(
-      { vault: null, asset: "MON", referenceFeed: "MON/USD", horizonSec: 180, bandBps: 10 },
+      { vault: null, asset: "MON", referenceFeed: "ETH/USD", horizonSec: 180, bandBps: 10 },
       [
-        { key: "market.mon_usd.price", value: 0.0421, unit: "USD", source: "pyth-hermes", observedAt: NOW, status: "ok" },
+        { key: "market.ref.price", value: 0.0421, unit: "USD", source: "pyth-hermes", observedAt: NOW, status: "ok" },
         { key: "network.block_number", value: "123", source: "monad-rpc", observedAt: NOW, status: "ok" },
-        { key: "history.mon_usd.change_1h", value: -35, unit: "bps", source: "pyth-hermes", observedAt: NOW, status: "ok" },
+        { key: "history.ref.change_1h", value: -35, unit: "bps", source: "pyth-hermes", observedAt: NOW, status: "ok" },
         { key: "vault.active", value: null, unit: "MON", source: "execution-vault", observedAt: NOW, status: "unavailable", note: "not deployed" },
       ],
       NOW,

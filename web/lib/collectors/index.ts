@@ -1,5 +1,6 @@
 import "server-only";
 import { contractAddress } from "@/lib/chain/deployments";
+import { PYTH } from "@/lib/config/public";
 import { DEFAULT_PARAMS } from "@/lib/decmarkt/params";
 import { buildState, type StateRecord } from "@/lib/jev/state";
 import { collectNetworkInputs } from "./network";
@@ -17,7 +18,7 @@ export async function collectState(): Promise<StateRecord> {
     {
       vault: contractAddress("ExecutionVault"),
       asset: "MON",
-      referenceFeed: "MON/USD",
+      referenceFeed: PYTH.feedSymbol,
       horizonSec: DEFAULT_PARAMS.horizonSec,
       bandBps: DEFAULT_PARAMS.bandBps,
     },

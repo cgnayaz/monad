@@ -29,10 +29,10 @@ not opinions. DecMarkt v1 governs the **risk posture of an on-chain treasury vau
 | | |
 |---|---|
 | Asset | Test MON held by `ExecutionVault` on Monad Testnet |
-| Reference market | Pyth `MON/USD` price feed (verified live on Monad Testnet, see §6) |
+| Reference market | Pyth `ETH/USD` price feed (verified live on Monad Testnet, see §6; MON/USD is not entitled for the project's Hermes key) |
 | Decision | Over the next horizon `H`, should the vault move part of its funds between its `ACTIVE` and `RESERVE` buckets? |
 | Bounded forks | `NO_ACTION`, `DERISK` (ACTION_A), `DEPLOY` (ACTION_B), `ESCALATE` |
-| Real outcome | Signed Pyth MON/USD price at execution vs. at `executedAt + H` |
+| Real outcome | Signed Pyth ETH/USD price at execution vs. the first update at or after `executedAt + H` |
 | Correct fork | Price fell more than band `b` → `DERISK`; rose more than `b` → `DEPLOY`; otherwise `NO_ACTION` |
 
 The bucket move is real on-chain state (real MON, real balances), deliberately
@@ -158,7 +158,8 @@ calldata, or functions.
 |---|---|---|
 | Monad Testnet chain id | `10143` (`0x279f`) | `eth_chainId` on `https://testnet-rpc.monad.xyz` |
 | Pyth contract on Monad Testnet | `0x2880aB155794e7179c9eE2e38200202908C17B43`, `version() = 1.4.6`, `getValidTimePeriod() = 60` | `cast call` |
-| Pyth MON/USD feed id | `0x31491744e2dbf6df7fcf4ac0820d18a609b49076d45066d3568424e62f686cd1` | Hermes `/v2/price_feeds?query=MON` |
+| Pyth ETH/USD feed id (reference) | `0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace` | Hermes `/v2/price_feeds?query=ETH`; key entitled (MON/USD `0x3149…6cd1` returns 403 Not entitled) |
+| Pyth accepts `parsePriceFeedUpdatesUnique` with the new update format | — | fork test `contracts/test/fork/RealPyth.t.sol` against the deployed contracts |
 | Hermes price updates require an API key | since 2026-08-26 (Pyth Core upgrade); endpoint `https://pyth.dourolabs.app/hermes`, `Authorization: Bearer` | unauthenticated request → 401; Pyth upgrade docs |
 
 Anything not in this table (explorer verification method, faucet limits, RPC log-range

@@ -1,10 +1,10 @@
 {
   "chainId": 10143,
   "contracts": {
-    "DecisionEngine": "0x56c3CD72df8667Db4486b5268DE5d4CDCf17c284",
-    "DecisionRegistry": "0x5Bb0b4Ae439e34c90a877237DB584FCEEBA37894",
-    "ExecutionVault": "0xd1E4768905AaA8B473617b0eF625C0acbfD59C1a",
-    "OutcomeRegistry": "0xfd9bbcaAd1334dD4363aaa973d7Fe2075dc53B0D"
+    "DecisionEngine": "0x2F4773B8d8cF125Fc0fCbd1973834065f3CA40b3",
+    "DecisionRegistry": "0x86d7E507F9eBfda17c5265804996b71028b05D10",
+    "ExecutionVault": "0x65355f7f037b84E14Bc2147700Bb6b3F29B56276",
+    "OutcomeRegistry": "0x97ec926D45115caB5D56aF2A8d373c78D80cFa47"
   },
-  "deployBlock": 65832355
+  "deployBlock": 65839318
 }

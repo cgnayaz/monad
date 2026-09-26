@@ -43,7 +43,7 @@ export const ACTION_LABEL: Record<WalletAction["kind"], string> = {
 
 /**
  * Build the call for a predefined action. `resolveAt` is the chain-derived publish time
- * (executedAt + horizon + 1) required by OutcomeRegistry; it is never user input.
+ * (executedAt + horizon) required by OutcomeRegistry; it is never user input.
  */
 export function prepareAction(action: WalletAction, resolveAt?: number): PreparedCall {
   const id = BigInt(action.decisionId);
