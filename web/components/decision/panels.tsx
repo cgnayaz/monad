@@ -109,7 +109,24 @@ export function ActionPanel({ v }: { v: DecisionView }) {
           },
           ...(e.status !== "executed" && e.detail !== "—" ? [{ k: "Detail", v: <span className="text-[12.5px] text-ink-2">{e.detail}</span> }] : []),
           ...(e.amountMoved !== null ? [{ k: "Amount moved", v: <span className="font-mono">{formatMon(BigInt(e.amountMoved))} MON</span> }] : []),
-          ...(e.after ? [{ k: "Buckets after", v: <span className="font-mono text-[12.5px]">ACTIVE {formatMon(BigInt(e.after.active))} · RESERVE {formatMon(BigInt(e.after.reserve))}</span> }] : []),
+          ...(e.after && e.amountMoved !== null && v.action
+            ? [
+                {
+                  k: "Vault before → after",
+                  v: (() => {
+                    const moved = BigInt(e.amountMoved!);
+                    const after = { a: BigInt(e.after!.active), r: BigInt(e.after!.reserve) };
+                    const before = v.action!.fork === "DERISK" ? { a: after.a + moved, r: after.r - moved } : v.action!.fork === "DEPLOY" ? { a: after.a - moved, r: after.r + moved } : after;
+                    return (
+                      <span className="font-mono text-[12.5px]">
+                        ACTIVE {formatMon(before.a)} → {formatMon(after.a)}
+                        <span className="block">RESERVE {formatMon(before.r)} → {formatMon(after.r)}</span>
+                      </span>
+                    );
+                  })(),
+                },
+              ]
+            : []),
           ...(e.startPrice ? [{ k: "Start price", v: <span className="font-mono">{e.startPrice} USD</span> }] : []),
           ...(e.txs.length ? [{ k: "Transactions", v: <TxList txs={e.txs} /> }] : []),
         ]}
@@ -138,28 +155,87 @@ export function TxList({ txs }: { txs: TxView[] }) {
 export function OutcomePanel({ v }: { v: DecisionView }) {
   const o = v.outcome;
   const tone: Tone = o.status === "verified" ? (o.success ? "pass" : "fail") : o.status === "pending" ? "wait" : "neutral";
+  const rep = v.settlement.reproduction;
+  if (o.status !== "verified") {
+    return (
+      <Panel title="Outcome (verify)">
+        <KeyValue
+          rows={[
+            { k: "Status", v: <StatusMark tone={tone}>{o.status}</StatusMark> },
+            { k: "Detail", v: <span className="text-[12.5px] text-ink-2">{o.detail}</span> },
+          ]}
+        />
+      </Panel>
+    );
+  }
   return (
-    <Panel title="Outcome (verify)">
+    <div className="border border-rule bg-surface">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule px-4 py-2.5">
+        <span className="text-[13px] font-semibold">Outcome (verify)</span>
+        <StatusMark tone={tone}>{o.success ? "success · expected = observed" : "miss · expected ≠ observed"}</StatusMark>
+      </div>
+      <div className="grid grid-cols-[96px_1fr_1fr] gap-x-3 border-b border-rule bg-surface-2 px-4 py-2">
+        <span />
+        <span className="label">Expected</span>
+        <span className="label">Observed</span>
+      </div>
+      {[
+        ["Action", <span key="e" className="font-mono">{o.expectedAction}</span>, <span key="o" className={`font-mono ${o.success ? "text-pass" : "text-fail"}`}>{o.observed}</span>],
+        ["Price", <span key="s" className="font-mono text-[12.5px]">{o.startPrice} USD <span className="block text-ink-3">at execution</span></span>, <span key="n" className="font-mono text-[12.5px]">{o.endPrice} USD <span className="block text-ink-3">after horizon</span></span>],
+        ["Move", <span key="b" className="font-mono text-[12.5px] text-ink-2">band ±{o.bandBps ?? "—"} bps</span>, <span key="m" className="font-mono text-[12.5px]">{o.moveBps} bps</span>],
+      ].map(([k, e, obs]) => (
+        <div key={String(k)} className="grid grid-cols-[96px_1fr_1fr] gap-x-3 border-b border-rule px-4 py-2">
+          <span className="label self-center">{k}</span>
+          {e}
+          {obs}
+        </div>
+      ))}
       <KeyValue
         rows={[
-          { k: "Status", v: <StatusMark tone={tone}>{o.status === "verified" ? (o.success ? "verified · success" : "verified · miss") : o.status}</StatusMark> },
-          ...(o.status === "verified"
+          { k: "Verification source", v: <span className="text-[12.5px]">{o.source}</span> },
+          { k: "Recorded", v: <span className="font-mono text-[12.5px]">{o.resolvedAt ? formatUtc(o.resolvedAt) : "—"}</span> },
+          ...(rep
             ? [
-                { k: "Expected action", v: <span className="font-mono">{o.expectedAction}</span> },
-                { k: "Observed result", v: <span className="font-mono">{o.observed}</span> },
-                { k: "Price", v: <span className="font-mono text-[12.5px]">{o.startPrice} → {o.endPrice} USD ({o.moveBps} bps)</span> },
-                { k: "Source", v: <span className="text-[12.5px]">{o.source}</span> },
-                { k: "Resolved", v: <span className="font-mono text-[12.5px]">{o.resolvedAt ? formatUtc(o.resolvedAt) : "—"}</span> },
+                {
+                  k: "Recomputed",
+                  v: <StatusMark tone={rep.outcomeMatches ? "pass" : "fail"}>{rep.outcomeMatches ? "matches the recorded outcome" : "differs from the recorded outcome"}</StatusMark>,
+                },
               ]
-            : [{ k: "Detail", v: <span className="text-[12.5px] text-ink-2">{o.detail}</span> }]),
+            : []),
         ]}
       />
-    </Panel>
+    </div>
   );
 }
 
 const resultTone = (r: string | null): Tone => (r === "CORRECT" ? "pass" : r === "NEUTRAL" || r === null ? "neutral" : "fail");
 
+function signed(wei: bigint) {
+  return wei < 0n ? `−${formatMon(-wei)}` : `+${formatMon(wei)}`;
+}
+
+/** One sentence that ties the prediction to the outcome and to the money. */
+function consequence(l: DecisionView["settlement"]["lines"][number]): string {
+  if (!l.result) return "";
+  const net = BigInt(l.net);
+  const prediction = l.choice ? `Predicted ${l.choice} with ${formatBps(l.probability ?? 0, 0)} confidence` : "Submitted no final decision";
+  const outcome = l.observed ? `the outcome made ${l.observed} correct` : "the outcome was recorded";
+  const effect =
+    l.result === "CORRECT"
+      ? `rewarded ${formatMon(BigInt(l.reward))} MON`
+      : l.result === "WRONG"
+        ? `penalised ${formatMon(BigInt(l.penalty))} MON`
+        : l.result === "MISSED"
+          ? `penalised ${formatMon(BigInt(l.penalty))} MON for missing`
+          : "bond returned unchanged";
+  return `${prediction}; ${outcome}; ${l.result.toLowerCase()} → ${effect} (net ${signed(net)} MON).`;
+}
+
+/**
+ * Settlement as accountability: per agent, what it predicted, what happened, whether it was
+ * right, and how its bond changed — with the deterministic rule behind every number and a
+ * check that recomputing it from on-chain inputs gives exactly what the contract recorded.
+ */
 export function SettlementPanel({ v }: { v: DecisionView }) {
   const s = v.settlement;
   if (s.lines.length === 0) {
@@ -173,44 +249,91 @@ export function SettlementPanel({ v }: { v: DecisionView }) {
     );
   }
   const settled = s.status === "SETTLED";
+  const rep = s.reproduction;
   return (
-    <Table caption="Settlement">
-      <thead>
-        <tr>
-          <Th>Agent</Th>
-          <Th>Result</Th>
-          <Th align="right">Bond</Th>
-          <Th align="right">Penalty</Th>
-          <Th align="right">Reward</Th>
-          <Th align="right">Net</Th>
-        </tr>
-      </thead>
-      <tbody>
+    <div className="border border-rule bg-surface">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule px-4 py-2.5">
+        <span className="text-[13px] font-semibold">Settlement</span>
+        {settled && rep ? (
+          <StatusMark tone={rep.matches ? "pass" : "fail"}>{rep.matches ? "reproduced · matches" : "reproduction differs"}</StatusMark>
+        ) : (
+          <StatusMark tone={settled ? "pass" : "wait"}>{s.status.toLowerCase()}</StatusMark>
+        )}
+      </div>
+      <div className="hidden grid-cols-[minmax(130px,1fr)_minmax(150px,1.2fr)_110px_110px_repeat(4,minmax(74px,auto))] gap-x-4 border-b border-rule bg-surface-2 px-4 py-2 md:grid">
+        {["Agent", "Predicted", "Actual", "Result", "Bond", "Penalty", "Reward", "Final"].map((h, i) => (
+          <span key={h} className={`label ${i >= 4 ? "text-right" : ""}`}>
+            {h}
+          </span>
+        ))}
+      </div>
+      <ul>
         {s.lines.map((l) => {
           const net = BigInt(l.net);
           return (
-            <tr key={l.agentId}>
-              <Td className="whitespace-nowrap font-medium">{l.name}</Td>
-              <Td>{l.result ? <StatusMark tone={resultTone(l.result)}>{l.result}</StatusMark> : <span className="text-[12px] text-ink-3">{s.status.toLowerCase()}</span>}</Td>
-              <Td align="right" mono>{formatMon(BigInt(l.bond))}</Td>
-              {settled ? (
-                <>
-                  <Td align="right" mono>{formatMon(BigInt(l.penalty))}</Td>
-                  <Td align="right" mono>{formatMon(BigInt(l.reward))}</Td>
-                  <Td align="right" mono className={net > 0n ? "text-pass" : net < 0n ? "text-fail" : ""}>
-                    {net < 0n ? `−${formatMon(-net)}` : `+${formatMon(net)}`}
-                  </Td>
-                </>
-              ) : (
-                <Td colSpan={3} align="right" className="text-[12px] text-ink-3">
-                  {s.status === "LOCKED" ? "until the outcome is verified" : "returned in full"}
-                </Td>
+            <li key={l.agentId} className="border-b border-rule px-4 py-3 last:border-b-0">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px] md:grid-cols-[minmax(130px,1fr)_minmax(150px,1.2fr)_110px_110px_repeat(4,minmax(74px,auto))]">
+                <div className="col-span-2 font-medium md:col-span-1">{l.name}</div>
+                <Cell k="Predicted">
+                  {l.choice ? (
+                    <span className="font-mono">
+                      {l.choice}
+                      <span className="block text-[11.5px] text-ink-3">
+                        score {l.score} · p {formatBps(l.probability ?? 0, 0)}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-ink-3">no decision</span>
+                  )}
+                </Cell>
+                <Cell k="Actual">{l.observed ? <span className="font-mono">{l.observed}</span> : <span className="text-ink-3">{settled ? "—" : "pending"}</span>}</Cell>
+                <Cell k="Result">{l.result ? <StatusMark tone={resultTone(l.result)}>{l.result}</StatusMark> : <span className="text-[12px] text-ink-3">{s.status.toLowerCase()}</span>}</Cell>
+                <Cell k="Bond" right>{formatMon(BigInt(l.bond))}</Cell>
+                <Cell k="Penalty" right>{settled ? formatMon(BigInt(l.penalty)) : "—"}</Cell>
+                <Cell k="Reward" right>{settled ? formatMon(BigInt(l.reward)) : "—"}</Cell>
+                <Cell k="Final" right>
+                  {settled ? (
+                    <span className={net > 0n ? "text-pass" : net < 0n ? "text-fail" : ""}>
+                      {formatMon(BigInt(l.returned))}
+                      <span className="block text-[11.5px]">{signed(net)}</span>
+                    </span>
+                  ) : (
+                    <span className="text-ink-3">{s.status === "LOCKED" ? "locked" : "returned"}</span>
+                  )}
+                </Cell>
+              </div>
+              {settled && (
+                <p className="mt-2 text-[12px] text-ink-2">
+                  {consequence(l)}
+                  {l.formula && (
+                    <span className="mt-0.5 block font-mono text-[11.5px] text-ink-3">
+                      rule: {l.formula}
+                      {l.reproduced === false && <span className="text-fail"> · differs from the contract</span>}
+                    </span>
+                  )}
+                </p>
               )}
-            </tr>
+            </li>
           );
         })}
-      </tbody>
-    </Table>
+      </ul>
+      {settled && rep && (
+        <p className="border-t border-rule px-4 py-2 text-[11.5px] text-ink-3">
+          Outcome and settlement recomputed from on-chain inputs with the protocol rules and compared with what the contract recorded. Recomputed with OutcomeRegistry&apos;s current parameters (slash {formatBps(rep.params.slashBps, 0)}, miss {formatBps(rep.params.missPenaltyBps, 0)}).
+          {!rep.matches && ` ${rep.mismatches.join("; ")}. If an admin changed a parameter after settlement, the recorded values stand.`}
+          {" "}Final = bond − penalty + reward, credited to the agent&apos;s free bond on-chain.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Cell({ k, children, right = false }: { k: string; children: React.ReactNode; right?: boolean }) {
+  return (
+    <div className={`min-w-0 ${right ? "md:text-right" : ""}`}>
+      <p className="label md:hidden">{k}</p>
+      <div className={right ? "font-mono tabular" : ""}>{children}</div>
+    </div>
   );
 }
 

@@ -236,6 +236,15 @@ text fields *unavailable*.
 | agent bond, accuracy | `DecisionRegistry.getAgent` |
 | model id, latency | AgentRun payload (labelled "reported by server") |
 
+## 5a. Accountability views
+
+- Decision page, section *Accountability*: per agent — predicted choice / score /
+  probability, actual outcome, result, bond, penalty, reward, final amount returned, net,
+  a one-sentence consequence and the rule; plus the reproduction check.
+- `/agents/[id]`: the agent's ledger across decisions (read from DecisionRegistry and
+  OutcomeRegistry storage): prediction, executed action, actual outcome, result and net per
+  decision, with accuracy and resulting voting weight.
+
 ## 6. Provenance (`web/lib/model/provenance.ts`)
 
 ```

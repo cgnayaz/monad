@@ -5,12 +5,12 @@ import { ReadinessPanel } from "@/components/domain/readiness-panel";
 import { LinkButton } from "@/components/ui/button";
 import { PageHeader, Section } from "@/components/ui/layout";
 import { collectState } from "@/lib/collectors";
-import { getDecisionProvenance, listDecisions } from "@/lib/data/decisions";
-import { attachVerifiedPayloads } from "@/lib/data/payloads";
+import { chainDecision } from "@/lib/data/decision-view";
+import { listDecisions } from "@/lib/data/decisions";
 import { readiness } from "@/lib/data/readiness";
 import { toWireJson } from "@/lib/engine/wire";
 import { buildQuestionSet } from "@/lib/jev/questions";
-import { fromProvenance, fromRound, type DecisionView } from "@/lib/view/decision-view";
+import { fromRound, type DecisionView } from "@/lib/view/decision-view";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +19,9 @@ async function latestChainDecision(): Promise<{ view: DecisionView | null; note:
   if (list.status === "unavailable") return { view: null, note: `${list.reason}.` };
   const latest = list.value[0];
   if (!latest) return { view: null, note: "No decision has been recorded on-chain yet." };
-  const p = await getDecisionProvenance(latest.id);
-  if (p.status !== "ok" || !p.value) return { view: null, note: p.status === "unavailable" ? p.reason : "Decision not found." };
-  const verified = await attachVerifiedPayloads(p.value);
-  return { view: fromProvenance(verified.provenance, verified.checks), note: "" };
+  const c = await chainDecision(latest.id);
+  if (c.status !== "ok" || !c.value) return { view: null, note: c.status === "unavailable" ? c.reason : "Decision not found." };
+  return { view: c.value.view, note: "" };
 }
 
 export default async function DashboardPage() {

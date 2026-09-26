@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Avail } from "@/components/ui/availability";
 import { Hash } from "@/components/ui/hash";
 import { PageHeader, Section } from "@/components/ui/layout";
@@ -34,7 +35,9 @@ export default async function AgentsPage() {
               <li key={spec.key} className="grid grid-cols-1 gap-x-8 gap-y-4 border-b border-rule px-5 py-5 last:border-b-0 lg:grid-cols-[220px_minmax(0,1fr)_260px]">
                 <div>
                   <p className="font-mono text-[11px] text-ink-3">agent {spec.agentId}</p>
-                  <p className="text-[15px] font-medium">{spec.name}</p>
+                  <Link href={`/agents/${spec.agentId}`} className="text-[15px] font-medium underline decoration-rule underline-offset-2 hover:decoration-ink">
+                    {spec.name}
+                  </Link>
                   <p className="text-[12.5px] text-ink-2">{DOMAIN_LABEL[spec.key]}</p>
                 </div>
                 <div className="min-w-0 space-y-3">

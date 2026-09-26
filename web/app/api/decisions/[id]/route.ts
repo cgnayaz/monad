@@ -1,8 +1,6 @@
 import type { NextRequest } from "next/server";
-import { getDecisionProvenance } from "@/lib/data/decisions";
-import { attachVerifiedPayloads } from "@/lib/data/payloads";
+import { chainDecision } from "@/lib/data/decision-view";
 import { toWireJson } from "@/lib/engine/wire";
-import { fromProvenance } from "@/lib/view/decision-view";
 
 export const dynamic = "force-dynamic";
 
@@ -10,11 +8,10 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: NextRequest, ctx: RouteContext<"/api/decisions/[id]">) {
   const { id } = await ctx.params;
   if (!/^[1-9]\d{0,30}$/.test(id)) return Response.json({ error: "Invalid decision id" }, { status: 400 });
-  const p = await getDecisionProvenance(BigInt(id));
-  if (p.status !== "ok") return Response.json({ error: p.reason }, { status: 503 });
-  if (!p.value) return Response.json({ error: "Decision not found" }, { status: 404 });
-  const verified = await attachVerifiedPayloads(p.value);
-  return new Response(toWireJson(fromProvenance(verified.provenance, verified.checks)), {
+  const c = await chainDecision(BigInt(id));
+  if (c.status !== "ok") return Response.json({ error: c.reason }, { status: 503 });
+  if (!c.value) return Response.json({ error: "Decision not found" }, { status: 404 });
+  return new Response(toWireJson(c.value.view), {
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
 }

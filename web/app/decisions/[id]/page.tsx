@@ -22,12 +22,10 @@ import { PageHeader, Section } from "@/components/ui/layout";
 import { EmptyState, StatusMark } from "@/components/ui/status";
 import { LifecycleActions } from "@/components/wallet/lifecycle-actions";
 import { explorer } from "@/lib/chain/monad";
-import { getDecisionProvenance } from "@/lib/data/decisions";
-import { attachVerifiedPayloads } from "@/lib/data/payloads";
+import { chainDecision } from "@/lib/data/decision-view";
 import { formatDuration, formatMon, formatUtc } from "@/lib/format";
 import { maskToForks } from "@/lib/jev/forks";
 import { traceDecision, validateProvenance } from "@/lib/model/provenance";
-import { fromProvenance } from "@/lib/view/decision-view";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +42,7 @@ const SECTIONS = [
   ["action", "Action"],
   ["transactions", "Transactions"],
   ["outcome", "Outcome"],
-  ["settlement", "Settlement"],
+  ["settlement", "Accountability"],
   ["integrity", "Integrity"],
   ["provenance", "Provenance"],
 ] as const;
@@ -52,7 +50,7 @@ const SECTIONS = [
 export default async function DecisionPage(props: PageProps<"/decisions/[id]">) {
   const { id: raw } = await props.params;
   if (!/^\d+$/.test(raw)) notFound();
-  const res = await getDecisionProvenance(BigInt(raw));
+  const res = await chainDecision(BigInt(raw));
 
   if (res.status === "unavailable") {
     return (
@@ -64,9 +62,7 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
   }
   if (!res.value) notFound();
 
-  const verified = await attachVerifiedPayloads(res.value);
-  const p = verified.provenance;
-  const v = fromProvenance(p, verified.checks);
+  const { view: v, provenance: p, store } = res.value;
   const d = p.decision;
   const issues = validateProvenance(p);
   const n = (i: number) => String(i + 1).padStart(2, "0");
@@ -78,7 +74,7 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
         title={`Decision #${d.decisionId}`}
         lead={
           <span className="font-mono text-[13px]">
-            created {formatUtc(d.createdAt)} · proposer <a className="underline decoration-rule underline-offset-2 hover:decoration-ink" href={explorer.address(d.proposer)} target="_blank" rel="noreferrer">{d.proposer}</a>
+            created {formatUtc(d.createdAt)} · proposer <a className="break-all underline decoration-rule underline-offset-2 hover:decoration-ink" href={explorer.address(d.proposer)} target="_blank" rel="noreferrer">{d.proposer}</a>
           </span>
         }
         aside={<StatusMark tone={statusTone(d.status)}>{d.status}</StatusMark>}
@@ -159,7 +155,12 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
         </div>
       </Section>
 
-      <Section id="settlement" index={n(7)} title="Settlement" aside={<StatusMark tone={v.settlement.status === "SETTLED" ? "pass" : "wait"}>{v.settlement.status}</StatusMark>}>
+      <Section
+        id="settlement"
+        index={n(7)}
+        title="Accountability"
+        description="What each agent predicted, what actually happened, whether it was right, and how its bond changed. Settlement follows fixed protocol rules; no model decides who deserves a reward."
+      >
         <SettlementPanel v={v} />
       </Section>
 
@@ -167,7 +168,7 @@ export default async function DecisionPage(props: PageProps<"/decisions/[id]">) 
         id="integrity"
         index={n(8)}
         title="Integrity"
-        description={verified.store.available ? `Off-chain payloads (${verified.store.kind}) recomputed and compared with the on-chain commitments.` : `${verified.store.reason}. On-chain values are shown without their payloads.`}
+        description={store.available ? `Off-chain payloads (${store.kind}) recomputed and compared with the on-chain commitments.` : `${store.reason}. On-chain values are shown without their payloads.`}
       >
         {v.integrity.length ? <IntegrityPanel v={v} /> : <EmptyState title="No checks" />}
       </Section>

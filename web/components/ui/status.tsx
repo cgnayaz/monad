@@ -20,7 +20,7 @@ const textTone: Record<Tone, string> = {
 /** Small-caps text with a 6 px square marker. Not a pill. `live` blinks the marker while in flight. */
 export function StatusMark({ tone, children, live = false }: { tone: Tone; children: ReactNode; live?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-2 whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.06em] ${textTone[tone]}`}>
+    <span className={`inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.06em] ${textTone[tone]}`}>
       <span aria-hidden className={`inline-block h-1.5 w-1.5 shrink-0 ${markTone[tone]} ${live ? "dm-pending" : ""}`} />
       {children}
     </span>

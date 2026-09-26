@@ -5,6 +5,7 @@ import { createTestClient, createWalletClient, encodeAbiParameters, http, parseE
 import { privateKeyToAccount } from "viem/accounts";
 import { PYTH } from "@/lib/config/public";
 import { getDecisionProvenance } from "@/lib/data/decisions";
+import { reproduce } from "@/lib/decmarkt/reproduce";
 import { runDecisionPipeline } from "@/lib/engine/pipeline";
 import { AGENTS } from "@/lib/jev/agents";
 import { buildState } from "@/lib/jev/state";
@@ -134,5 +135,10 @@ describe("ChainExecutionLayer on the real contracts", () => {
     expect(p.decision.transitions.map((t) => t.tx?.functionName)).toEqual(["createDecision", "openDecision", "aggregate", "aggregate", "execute", "resolve"]);
 
     expect(await layer.advance("1")).toMatchObject({ step: "none", status: "RESOLVED" });
+
+    // The settlement recorded by OutcomeRegistry is exactly what the deterministic rules give.
+    const repro = reproduce(p, { slashBps: 3000, missPenaltyBps: 1000 });
+    expect(repro?.matches).toBe(true);
+    expect(repro?.outcome?.correctFork).toBe(p.outcome?.observedResult?.correctFork);
   });
 });

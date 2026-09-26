@@ -225,6 +225,16 @@ Two distinct verifications:
    correctFork = move < −band ? DERISK : move > band ? DEPLOY : NO_ACTION
    ```
    Settlement follows deterministically (CONTRACT_SPEC.md §10).
+   The contract records `expectedAction`, `observedResult`, `success`, `outcomeValue`,
+   start/end price and times; the verification source (Pyth address, feed, publish
+   window) is read from OutcomeRegistry's immutables.
+
+   **Reproduction.** Every time a settled decision is shown, `web/lib/decmarkt/reproduce.ts`
+   recomputes the move, the correct fork and every agent's penalty and reward from on-chain
+   inputs (prices, final submissions, locks, round reward, OutcomeRegistry parameters) and
+   compares them with what the contract recorded. The UI shows "reproduced · matches" and,
+   per agent, the rule behind the numbers (e.g. `bond × slash 30 % × probability 58 %`). No
+   model is involved in outcome or settlement at any point.
 2. **Integrity verification (audit).** The browser recomputes `stateHash`,
    `questionsHash` and each `reasonHash` from the
    published payloads and compares them to chain. Results are shown per item as

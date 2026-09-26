@@ -39,7 +39,7 @@ export function KeyFigures({ v }: { v: DecisionView }) {
       <Figure
         label="Execution"
         value={v.execution.status === "executed" ? "EXECUTED" : v.execution.status === "not-submitted" ? muted("NOT SUBMITTED") : v.execution.status === "awaiting" ? "AWAITING" : muted("—")}
-        note={v.execution.status === "not-submitted" ? "preview only" : v.execution.detail}
+        note={v.execution.status === "not-submitted" ? "simulation: no transaction" : v.execution.detail}
       />
       <Figure
         label="Outcome"

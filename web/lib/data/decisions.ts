@@ -3,7 +3,7 @@ import { decodeFunctionData, type Abi } from "viem";
 import { decisionEngineAbi, decisionRegistryAbi, executionVaultAbi, outcomeRegistryAbi } from "@/lib/chain/abis";
 import { publicClient } from "@/lib/chain/client";
 import { CONTRACT_NAMES, deployment, type ContractName, type Deployment } from "@/lib/chain/deployments";
-import { MONAD_TESTNET, PYTH } from "@/lib/config/public";
+import { MONAD_TESTNET } from "@/lib/config/public";
 import { AGENTS } from "@/lib/jev/agents";
 import { leadingMetrics } from "@/lib/decmarkt/aggregate";
 import { ACTION_SPACE } from "@/lib/model/action";
@@ -35,8 +35,6 @@ import {
  * off-chain payloads are attached elsewhere after their hashes are checked.
  */
 
-/** OutcomeRegistry.RESOLUTION_TOLERANCE (CONTRACT_SPEC.md §8). */
-const RESOLUTION_TOLERANCE_SEC = 60;
 
 export interface DecisionSummary {
   id: bigint;
@@ -210,7 +208,13 @@ export async function getDecisionProvenance(id: bigint): Promise<Availability<De
 
     let outcome: Outcome | null = null;
     if (reached("RESOLVED") && action?.execution) {
-      const o = await publicClient.readContract({ address: addr.OutcomeRegistry, abi: outcomeRegistryAbi, functionName: "getOutcome", args: [id] });
+      const [o, pythAddr, priceId, tolerance] = await Promise.all([
+        publicClient.readContract({ address: addr.OutcomeRegistry, abi: outcomeRegistryAbi, functionName: "getOutcome", args: [id] }),
+        publicClient.readContract({ address: addr.OutcomeRegistry, abi: outcomeRegistryAbi, functionName: "pyth" }),
+        publicClient.readContract({ address: addr.OutcomeRegistry, abi: outcomeRegistryAbi, functionName: "priceId" }),
+        publicClient.readContract({ address: addr.OutcomeRegistry, abi: outcomeRegistryAbi, functionName: "RESOLUTION_TOLERANCE" }),
+      ]);
+      const oracle = { pyth: pythAddr, priceId, tolerance: Number(tolerance) };
       const from = action.execution.executedAt + decision.config.horizon;
       const observed = o.isVoid
         ? null
@@ -229,9 +233,9 @@ export async function getDecisionProvenance(id: bigint): Promise<Availability<De
         verificationSource: {
           kind: "pyth",
           chainId: MONAD_TESTNET.id,
-          contract: PYTH.contract,
-          feedId: PYTH.monUsdFeedId,
-          window: { from, to: from + RESOLUTION_TOLERANCE_SEC },
+          contract: oracle.pyth,
+          feedId: oracle.priceId,
+          window: { from, to: from + oracle.tolerance },
         },
         status: observed ? "VERIFIED" : "VOID",
         timestamp: Number(o.resolvedAt),

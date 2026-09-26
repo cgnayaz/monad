@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, InsufficientFundsError, UserRejectedRequestError } from "viem";
 import { decisionRegistryAbi } from "./abis";
 import { classifyTxError } from "./tx-errors";
+import { contractAddress } from "./deployments";
 import { ACTION_LABEL, prepareAction } from "./wallet-actions";
 
 describe("classifyTxError", () => {
@@ -33,8 +34,16 @@ describe("predefined wallet actions", () => {
       "OutcomeRegistry.resolve",
     ]);
   });
-  it("refuses to build calls while the contracts are not deployed", () => {
-    expect(() => prepareAction({ kind: "aggregate", decisionId: "1" })).toThrow(/not deployed/);
+  it("targets the centrally configured contracts with only a decision id", () => {
+    const agg = prepareAction({ kind: "aggregate", decisionId: "1" });
+    expect(agg.address).toBe(contractAddress("DecisionEngine"));
+    expect(agg.args).toEqual([1n]);
+    expect(agg.priceUpdate).toBeNull();
+    const exe = prepareAction({ kind: "execute", decisionId: "7" });
+    expect(exe.address).toBe(contractAddress("ExecutionVault"));
+    expect(exe.args).toEqual([7n]); // the signed price update is appended at send time, never user input
+    expect(exe.priceUpdate).toEqual({ at: null });
+    expect(prepareAction({ kind: "resolve", decisionId: "7" }, 1_790_000_061).priceUpdate).toEqual({ at: 1_790_000_061 });
   });
   it("rejects an invalid decision id and a guardian choice outside the bounded set", () => {
     expect(() => prepareAction({ kind: "execute", decisionId: "0" })).toThrow(/Invalid decision id/);

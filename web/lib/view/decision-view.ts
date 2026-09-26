@@ -7,6 +7,7 @@ import type { SettlementStatus } from "@/lib/model/accountability";
 import { AGENT_FAILURE_KINDS, type AgentFailureKind, type AgentRun } from "@/lib/model/decision";
 import type { ExecutionHandoff, FinalDecision, PipelineStage, StageStatus } from "@/lib/model/final-decision";
 import { finalSubmission, isFullQuestionSet, isFullState, type DecisionProvenance } from "@/lib/model/provenance";
+import type { Reproduction, SettlementParamsOnChain } from "@/lib/decmarkt/reproduce";
 import type { QuestionSet } from "@/lib/model/question";
 import type { StateInput, StateRecord } from "@/lib/model/state";
 import type { TxRef } from "@/lib/model/transaction";
@@ -15,7 +16,7 @@ import { FORKS, type Fork, type Hex, type Status } from "@/lib/types/protocol";
 /**
  * One presentation model for a decision, whatever its source:
  *   - "chain":   a decision read from the contracts, with payloads attached only if verified
- *   - "browser": a round run from this browser (preview or live), from the pipeline stream
+ *   - "browser": a round run from this browser (simulation or live), from the pipeline stream
  * Everything is JSON-safe (wei and prices as decimal strings). Nothing here invents a value:
  * unknown fields are null and the components say why.
  */
@@ -125,11 +126,33 @@ export interface DecisionView {
     resolvedAt: number | null;
     /** When the outcome can be verified (executedAt + horizon). */
     availableAt: number | null;
+    bandBps: number | null;
   };
   settlement: {
     status: SettlementStatus | "na";
     detail: string;
-    lines: { agentId: number; name: string; result: string | null; bond: string; penalty: string; reward: string; net: string }[];
+    lines: {
+      agentId: number;
+      name: string;
+      /** What the agent predicted (its final decision); null = none submitted. */
+      choice: Fork | null;
+      score: number | null;
+      probability: number | null;
+      /** What actually happened (the fork the observed move made correct). */
+      observed: Fork | null;
+      result: string | null;
+      bond: string;
+      penalty: string;
+      reward: string;
+      net: string;
+      /** bond − penalty + reward: what the agent gets back from this decision. */
+      returned: string;
+      /** The deterministic rule behind the numbers, when reproduced. */
+      formula: string | null;
+      reproduced: boolean | null;
+    }[];
+    /** Outcome and settlement recomputed from on-chain inputs and compared with the contract. */
+    reproduction: { matches: boolean; outcomeMatches: boolean; mismatches: string[]; params: { slashBps: number; missPenaltyBps: number } } | null;
   };
   transitions: { status: Status; blockNumber: string; tx: TxView | null }[];
   integrity: { label: string; status: "VERIFIED" | "MISMATCH" | "UNAVAILABLE"; onChain: Hex | null }[];
@@ -383,11 +406,12 @@ export function fromRound(p: RoundProgress): DecisionView {
           source: null,
           resolvedAt: null,
           availableAt: ex?.status === "submitted" && ex.next?.step === "resolve" ? ex.next.availableAt : null,
+          bandBps: d?.parameters.bandBps ?? null,
         }
-      : { status: "na", detail: d ? "preview simulation: no transaction is sent" : "—", expectedAction: null, observed: null, success: null, moveBps: null, startPrice: null, endPrice: null, source: null, resolvedAt: null, availableAt: null },
+      : { status: "na", detail: d ? "simulation: no transaction is sent" : "—", expectedAction: null, observed: null, success: null, moveBps: null, startPrice: null, endPrice: null, source: null, resolvedAt: null, availableAt: null, bandBps: null },
     settlement: live
-      ? { status: "LOCKED", detail: "bonds locked until the outcome is verified", lines: [] }
-      : { status: "na", detail: d ? "no bonds in preview" : "—", lines: [] },
+      ? { status: "LOCKED", detail: "bonds locked until the outcome is verified", lines: [], reproduction: null }
+      : { status: "na", detail: d ? "no bonds in simulation" : "—", lines: [], reproduction: null },
     transitions: [],
     integrity: [],
     payloads: d?.payloads.detail ?? null,
@@ -397,7 +421,11 @@ export function fromRound(p: RoundProgress): DecisionView {
 
 // ─── From the chain ─────────────────────────────────────────────────────────
 
-export function fromProvenance(p: DecisionProvenance, integrity: IntegrityCheck[] = []): DecisionView {
+export function fromProvenance(
+  p: DecisionProvenance,
+  integrity: IntegrityCheck[] = [],
+  repro: { reproduction: Reproduction | null; params: SettlementParamsOnChain } | null = null,
+): DecisionView {
   const d = p.decision;
   const state = isFullState(p.state) ? p.state : null;
   const questions = isFullQuestionSet(p.questions) ? p.questions : null;
@@ -503,7 +531,11 @@ export function fromProvenance(p: DecisionProvenance, integrity: IntegrityCheck[
           startPrice: o.observedResult ? formatPrice(o.observedResult.start.price, expo) : null,
           endPrice: o.observedResult ? formatPrice(o.observedResult.end.price, expo) : null,
           availableAt: e ? e.executedAt + d.config.horizon : null,
-          source: o.verificationSource.kind === "pyth" ? `Pyth ${o.verificationSource.feedId.slice(0, 10)}… on chain ${o.verificationSource.chainId}` : "simulation",
+          bandBps: d.config.bandBps,
+          source:
+            o.verificationSource.kind === "pyth"
+              ? `Pyth ${o.verificationSource.contract} · feed ${o.verificationSource.feedId.slice(0, 10)}… · publish window ${formatUtc(o.verificationSource.window.from)} + ${o.verificationSource.window.to - o.verificationSource.window.from} s`
+              : "simulation",
           resolvedAt: o.timestamp,
         }
       : {
@@ -518,6 +550,7 @@ export function fromProvenance(p: DecisionProvenance, integrity: IntegrityCheck[
           source: null,
           resolvedAt: null,
           availableAt: e ? e.executedAt + d.config.horizon : null,
+          bandBps: d.config.bandBps,
         },
     settlement: p.settlement
       ? {
@@ -532,17 +565,31 @@ export function fromProvenance(p: DecisionProvenance, integrity: IntegrityCheck[
                   : p.settlement.settlementStatus === "VOID"
                     ? "outcome void; bonds returned in full"
                     : "bonds not yet locked",
-          lines: p.settlement.lines.map((l) => ({
-            agentId: l.agentId,
-            name: AGENTS.find((a) => a.agentId === l.agentId)?.name ?? `Agent ${l.agentId}`,
-            result: l.result,
-            bond: String(l.bond),
-            penalty: String(l.penalty),
-            reward: String(l.reward),
-            net: String(l.net),
-          })),
+          lines: p.settlement.lines.map((l) => {
+            const f = finalSubmission(p, l.agentId);
+            const rl = repro?.reproduction?.lines.find((x) => x.agentId === l.agentId);
+            return {
+              agentId: l.agentId,
+              name: AGENTS.find((a) => a.agentId === l.agentId)?.name ?? `Agent ${l.agentId}`,
+              choice: f?.choice ?? null,
+              score: f?.score ?? null,
+              probability: f?.probability ?? null,
+              observed: o?.observedResult?.correctFork ?? null,
+              result: l.result,
+              bond: String(l.bond),
+              penalty: String(l.penalty),
+              reward: String(l.reward),
+              net: String(l.net),
+              returned: String(l.bond - l.penalty + l.reward),
+              formula: rl?.formula ?? null,
+              reproduced: rl ? rl.matches : null,
+            };
+          }),
+          reproduction: repro?.reproduction
+            ? { matches: repro.reproduction.matches, outcomeMatches: !!repro.reproduction.outcome?.matches, mismatches: repro.reproduction.mismatches, params: repro.params }
+            : null,
         }
-      : { status: "na", detail: "—", lines: [] },
+      : { status: "na", detail: "—", lines: [], reproduction: null },
     transitions: d.transitions.map((t) => ({ status: t.status, blockNumber: String(t.blockNumber), tx: tx(t.tx) })),
     integrity: integrity.map((c) => ({ label: c.label, status: c.status, onChain: c.onChain })),
     payloads: null,
