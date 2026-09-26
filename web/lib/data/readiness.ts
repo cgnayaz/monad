@@ -46,7 +46,7 @@ export async function readiness(): Promise<Readiness> {
       ? { ok: true, detail: "Dört kontratın tümü dağıtıldı" }
       : { ok: false, detail: `Dağıtılmamış: ${d.missing.join(", ")}` },
     ai: ai.configured
-      ? { ok: true, detail: `Sağlayıcı yapılandırıldı (${ai.provider} · ${ai.model})` }
+      ? { ok: true, detail: `Sağlayıcı yapılandırıldı (${ai.provider}${ai.model ? ` · ${ai.model}` : ""})` }
       : { ok: false, detail: ai.reason ?? "AI sağlayıcı yapılandırılmamış" },
     oracle: env.PYTH_API_KEY
       ? { ok: true, detail: "Pyth Hermes anahtarı yapılandırıldı" }

@@ -11,10 +11,17 @@ const privateKey = z.string().regex(/^0x[0-9a-fA-F]{64}$/, "expected 0x-prefixed
 
 const ServerEnv = z.object({
   /** Which provider runs the agents. Default: gemini (anthropic only if ANTHROPIC_API_KEY is the only key set). */
-  AI_PROVIDER: z.enum(["gemini", "anthropic"]).optional(),
+  AI_PROVIDER: z.enum(["gemini", "anthropic", "openai", "groq", "openrouter"]).optional(),
   /** Gemini key; GOOGLE_API_KEY (the SDK's own variable name) is accepted as an alias. */
   GEMINI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  /** Any OpenAI-compatible endpoint (OpenAI, Groq, OpenRouter, …): key, base URL and model. */
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_BASE_URL: z.string().url().optional(),
+  OPENAI_MODEL: z.string().min(1).optional(),
+  /** Presets: base URL and default model are filled in for these. */
+  GROQ_API_KEY: z.string().min(1).optional(),
+  OPENROUTER_API_KEY: z.string().min(1).optional(),
   /** Model id; default depends on the provider (see lib/ai/index.ts). */
   AI_MODEL: z.string().min(1).optional(),
   /** Gemini only: comma-separated models tried when the primary is overloaded or out of quota. */
