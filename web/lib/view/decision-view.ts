@@ -1,7 +1,7 @@
 import type { Wire } from "@/lib/engine/wire";
 import { formatPrice, formatUtc } from "@/lib/format";
 import { AGENT_TR, FORK_TR, agentName, questionText } from "@/lib/i18n";
-import { AGENTS } from "@/lib/jev/agents";
+import { AGENTS, isRole, specOf } from "@/lib/jev/agents";
 import type { IntegrityCheck } from "@/lib/jev/verify";
 import { ACTION_SPACE } from "@/lib/model/action";
 import type { SettlementStatus } from "@/lib/model/accountability";
@@ -339,8 +339,11 @@ export function fromRound(p: RoundProgress): DecisionView {
   const agentsRunning = p.running.PARALLEL_DECISIONS === "running";
 
   const liveRound = d ? d.mode === "live" : p.running.COMMIT === "done";
-  const agents = AGENTS.map((spec) => {
-    const run = d?.parallel.runs[spec.key] ?? p.runs[spec.key];
+  const agents = AGENTS.map((role) => {
+    const run = d?.parallel.runs[role.key] ?? p.runs[role.key];
+    // The on-chain id this round used for the role (re-registered operators have new ids).
+    const subKey = Object.keys(p.submissions).find((k) => isRole(Number(k), role));
+    const spec = { ...role, agentId: run?.agentId ?? (subKey !== undefined ? Number(subKey) : role.agentId) };
     const view = run ? agentFromRun(spec, run, categoryOf) : { ...baseAgent(spec), status: (agentsRunning ? "processing" : "pending") as AgentStatus };
     const sub = p.submissions[spec.agentId];
     // A bond exists only when the decision was opened on-chain.
@@ -434,7 +437,7 @@ export function fromProvenance(
   const txAt = (s: Status) => tx(d.transitions.find((t) => t.status === s)?.tx);
   const pastOpen = !["CREATED", "OPEN"].includes(d.status);
 
-  const agents: AgentModuleView[] = AGENTS.filter((a) => d.participants.includes(a.agentId)).map((spec) => {
+  const agents: AgentModuleView[] = d.participants.map((id) => ({ ...specOf(id), agentId: id })).map((spec) => {
     const run = p.parallel ? Object.values(p.parallel.runs).find((r) => r.agentId === spec.agentId) : undefined;
     const sub = finalSubmission(p, spec.agentId);
     if (!sub) {
@@ -571,7 +574,7 @@ export function fromProvenance(
             const rl = repro?.reproduction?.lines.find((x) => x.agentId === l.agentId);
             return {
               agentId: l.agentId,
-              name: agentName(AGENTS.find((a) => a.agentId === l.agentId)?.key ?? "", `Ajan ${l.agentId}`),
+              name: agentName(specOf(l.agentId).key, `Ajan ${l.agentId}`),
               choice: f?.choice ?? null,
               score: f?.score ?? null,
               probability: f?.probability ?? null,

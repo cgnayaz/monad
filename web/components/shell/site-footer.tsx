@@ -8,6 +8,7 @@ export function SiteFooter() {
         <span>DecMarkt — zincir üstünde hesap verebilir AI kararları.</span>
         <span className="font-mono">zincir {MONAD_TESTNET.id}</span>
         <div className="ml-auto flex gap-5">
+          <Link href="/kurulum" className="hover:text-ink">Kurulum</Link>
           <Link href="/docs" className="hover:text-ink">Belgeler</Link>
           <a href={REPO_URL} className="hover:text-ink" target="_blank" rel="noreferrer">Kaynak kod</a>
           <a href={MONAD_TESTNET.explorerUrl} className="hover:text-ink" target="_blank" rel="noreferrer">Gezgin</a>

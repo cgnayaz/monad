@@ -36,7 +36,7 @@ export default async function DashboardPage() {
     submissions: {},
     decision: null,
   });
-  const r = readiness();
+  const r = await readiness();
 
   return (
     <>

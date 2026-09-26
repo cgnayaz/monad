@@ -1,5 +1,7 @@
 import "server-only";
+import { resolveAgentIds } from "@/lib/chain/agent-ids";
 import { deployment } from "@/lib/chain/deployments";
+import { signerKeys } from "@/lib/chain/signers";
 import { envDiagnostics, invalidEnvVars, serverEnv } from "@/lib/config/server";
 import { providerStatus } from "@/lib/ai";
 import { AGENTS } from "@/lib/jev/agents";
@@ -28,12 +30,16 @@ export interface Readiness {
   };
 }
 
-export function readiness(): Readiness {
+export async function readiness(): Promise<Readiness> {
   const env = serverEnv();
   const d = deployment();
   const ai = providerStatus();
-  const agentKeys = AGENTS.filter((a) => !!env[a.operatorKeyEnv]).length;
-  const signersOk = agentKeys === AGENTS.length && !!env.PROPOSER_PRIVATE_KEY && !!env.KEEPER_PRIVATE_KEY;
+  const keys = signerKeys();
+  const agentKeys = AGENTS.filter((a) => !!keys.agents[a.key]).length;
+  const keysOk = agentKeys === AGENTS.length && !!keys.proposer && !!keys.keeper;
+  const reg = keysOk && d.deployed ? await resolveAgentIds() : null;
+  const registeredCount = reg ? AGENTS.filter((a) => reg.registered[a.key]).length : 0;
+  const signersOk = keysOk && registeredCount === AGENTS.length;
 
   const r = {
     contracts: d.deployed
@@ -46,8 +52,10 @@ export function readiness(): Readiness {
       ? { ok: true, detail: "Pyth Hermes anahtarı yapılandırıldı" }
       : { ok: false, detail: "PYTH_API_KEY yapılandırılmamış (Hermes 2026-08-26'dan beri zorunlu tutuyor)" },
     signers: signersOk
-      ? { ok: true, detail: "Proposer, keeper ve 5 ajan operatörü yapılandırıldı" }
-      : { ok: false, detail: `${agentKeys}/5 ajan operatörü, proposer ${env.PROPOSER_PRIVATE_KEY ? "var" : "eksik"}, keeper ${env.KEEPER_PRIVATE_KEY ? "var" : "eksik"}` },
+      ? { ok: true, detail: `Proposer, keeper ve 5 ajan operatörü hazır${keys.derived ? " (SIGNER_SEED'den türetildi)" : ""}` }
+      : keysOk
+        ? { ok: false, detail: `Anahtarlar hazır ama ${registeredCount}/5 ajan operatörü zincirde kayıtlı; /kurulum sayfasından kaydedin` }
+        : { ok: false, detail: `${agentKeys}/5 ajan operatörü, proposer ${keys.proposer ? "var" : "eksik"}, keeper ${keys.keeper ? "var" : "eksik"} — Vercel'e SIGNER_SEED ekleyin` },
   };
   const ready = r.contracts.ok && r.ai.ok && r.oracle.ok && r.signers.ok;
   const simulation = r.ai.ok

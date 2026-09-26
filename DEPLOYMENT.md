@@ -83,7 +83,8 @@ Environment variables — the full annotated list is [web/.env.example](web/.env
 | `AI_MODEL`, `AI_FALLBACK_MODEL` | config (optional) | Gemini defaults `gemini-3.8-flash`, fallbacks `gemini-3.7-flash,gemini-3.6-flash` |
 | `ANTHROPIC_API_KEY` | secret (optional) | only with `AI_PROVIDER=anthropic` (default model `claude-opus-5`); the account needs credit |
 | `PYTH_API_KEY`, `PYTH_HERMES_URL` | secret / config | signed prices (execute, resolve, verification); key entitled to ETH/USD |
-| `SESSION_SECRET` | secret, ≥ 32 chars | operator sign-in; live mode is off without it |
+| `SESSION_SECRET` | secret, ≥ 32 chars | operator sign-in; live mode is off without it (derived from `SIGNER_SEED` when unset) |
+| `SIGNER_SEED` | secret, ≥ 32 chars | alternative to the seven signer keys below: each missing `*_PRIVATE_KEY` is derived from it (`keccak256("decmarkt/v1/<role>/<seed>")`). Register the derived operators once on `/kurulum` (admin wallet: register 5 agents in role order → ids 5–9, grant PROPOSER_ROLE, fund the proposer; the server then deposits bonds and gas). `agentId % 5` maps any generation back to its role |
 | `PROPOSER_PRIVATE_KEY`, `KEEPER_PRIVATE_KEY`, `AGENT_{RISK,YIELD,SECURITY,MARKET,HISTORY}_PRIVATE_KEY` | secret | live mode; must match the addresses in contracts/DEPLOYMENTS.md |
 | `BLOB_READ_WRITE_TOKEN` | secret | payload store (state, questions, reasons); created by connecting a Vercel Blob store |
 

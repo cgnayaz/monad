@@ -110,7 +110,7 @@ export function PrimitivesStep({ v }: { v: DecisionView }) {
 /** Every question-level decision, and how the ACTION row feeds the aggregation. */
 export function BatchStep({ v, decision }: { v: DecisionView; decision: { agentDecisions: { agentId: number; questionIndex: number; choice: string; score: number; probability: number }[] } | null }) {
   const items = v.questions.items ?? [];
-  const cell = (agentId: number, q: number) => decision?.agentDecisions.find((d) => d.agentId === agentId && d.questionIndex === q);
+  const cell = (agentId: number, q: number) => decision?.agentDecisions.find((d) => d.agentId % AGENTS.length === agentId % AGENTS.length && d.questionIndex === q);
   return (
     <div className="space-y-2">
       <Table caption="Soru düzeyindeki kararlar">
