@@ -24,11 +24,13 @@ describe("server environment", () => {
     expect(parseServerEnv({ "gemini_api_key ": "k1" }).env.GEMINI_API_KEY).toBe("k1");
     expect(parseServerEnv({ GOOGLE_GENERATIVE_AI_API_KEY: "k2" }).env.GEMINI_API_KEY).toBe("k2");
     expect(parseServerEnv({ GEMINI_API_KEY: "k3", GOOGLE_API_KEY: "k4" }).env.GEMINI_API_KEY).toBe("k3");
+    expect(parseServerEnv({ HERMES_API_KEY: "p1" }).env.PYTH_API_KEY).toBe("p1");
+    expect(parseServerEnv({ "pyth api key": "p2" }).env.PYTH_API_KEY).toBe("p2");
   });
 
   it("reports deployment and unrecognised similar names without values", () => {
     const d = envDiagnostics({ VERCEL_ENV: "production", VERCEL_GIT_COMMIT_SHA: "152c8f38d8", GEMINI_TOKEN: "secret" });
-    expect(d).toEqual({ deployment: "production", commit: "152c8f3", geminiKeyName: null, similarNames: ["GEMINI_TOKEN"] });
+    expect(d).toEqual({ deployment: "production", commit: "152c8f3", geminiKeyName: null, pythKeyName: null, similarNames: ["GEMINI_TOKEN"] });
     expect(JSON.stringify(d)).not.toContain("secret");
   });
 });

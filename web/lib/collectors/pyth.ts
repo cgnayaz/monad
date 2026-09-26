@@ -31,6 +31,15 @@ function scaled(p: { price: string; expo: number }): number {
   return Number(p.price) * 10 ** p.expo;
 }
 
+/** A Hermes failure in words an operator can act on. */
+function hermesError(status: number | undefined): string {
+  if (status === undefined) return "Hermes yanıt vermedi";
+  if (status === 401) return "Hermes HTTP 401: PYTH_API_KEY reddedildi (anahtar hatalı veya süresi dolmuş)";
+  if (status === 403) return "Hermes HTTP 403: anahtarın bu fiyat beslemesine (ETH/USD) yetkisi yok";
+  if (status === 429) return "Hermes HTTP 429: istek sınırı doldu, biraz sonra tekrar deneyin";
+  return `Hermes HTTP ${status}`;
+}
+
 async function fetchPrice(path: string): Promise<PythSnapshot> {
   const env = serverEnv();
   if (!env.PYTH_API_KEY) throw new Error("PYTH_API_KEY yapılandırılmamış");
@@ -46,7 +55,7 @@ async function fetchPrice(path: string): Promise<PythSnapshot> {
     if (res.ok || !(res.status === 429 || res.status >= 500)) break;
     await new Promise((r) => setTimeout(r, 500 + Math.random() * 500)); // one retry on rate limit / upstream error
   }
-  if (!res || !res.ok) throw new Error(`Hermes responded ${res?.status ?? "no response"}`);
+  if (!res || !res.ok) throw new Error(hermesError(res?.status));
   const body = HermesResponse.parse(await res.json());
   const first = body.parsed[0];
   return { price: first.price, ema: first.ema_price };
@@ -152,7 +161,7 @@ async function fetchUpdate(path: string): Promise<PriceUpdate> {
     signal: AbortSignal.timeout(8_000),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`Hermes responded ${res.status}`);
+  if (!res.ok) throw new Error(hermesError(res.status));
   const body = UpdateResponse.parse(await res.json());
   return {
     data: body.binary.data.map((d) => (d.startsWith("0x") ? d : `0x${d}`) as `0x${string}`),

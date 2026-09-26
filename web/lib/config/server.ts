@@ -34,6 +34,8 @@ export type ServerEnv = z.infer<typeof ServerEnv>;
 
 /** Names accepted for the Gemini key, in order of preference. */
 export const GEMINI_KEY_NAMES = ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_GEMINI_API_KEY", "GEMINI_KEY"] as const;
+/** Names accepted for the Pyth Hermes key, in order of preference. */
+export const PYTH_KEY_NAMES = ["PYTH_API_KEY", "PYTH_HERMES_API_KEY", "HERMES_API_KEY", "PYTH_KEY", "PYTH_HERMES_KEY"] as const;
 
 /** A variable name as typed into a dashboard, reduced to its canonical form ("gemini api key " → GEMINI_API_KEY). */
 const canonicalName = (k: string) => k.trim().toUpperCase().replace(/[\s-]+/g, "_");
@@ -54,10 +56,12 @@ export function normalizeEnv(raw: Record<string, string | undefined>): Record<st
     out[k] = t;
     loose[canonicalName(k)] ??= t;
   }
-  for (const name of [...Object.keys(ServerEnv.shape), ...GEMINI_KEY_NAMES]) if (!out[name] && loose[name]) out[name] = loose[name];
+  for (const name of [...Object.keys(ServerEnv.shape), ...GEMINI_KEY_NAMES, ...PYTH_KEY_NAMES]) if (!out[name] && loose[name]) out[name] = loose[name];
   if (out.AI_PROVIDER) out.AI_PROVIDER = out.AI_PROVIDER.toLowerCase();
   const gemini = GEMINI_KEY_NAMES.map((n) => out[n]).find(Boolean);
   if (gemini) out.GEMINI_API_KEY = gemini;
+  const pyth = PYTH_KEY_NAMES.map((n) => out[n]).find(Boolean);
+  if (pyth) out.PYTH_API_KEY = pyth;
   return out;
 }
 
@@ -70,13 +74,15 @@ export function envDiagnostics(raw: Record<string, string | undefined> = process
   deployment: string | null;
   commit: string | null;
   geminiKeyName: string | null;
+  pythKeyName: string | null;
   similarNames: string[];
 } {
   const set = Object.entries(raw).filter(([, v]) => v !== undefined && v.trim() !== "").map(([k]) => k);
   const geminiKeyName = set.find((k) => (GEMINI_KEY_NAMES as readonly string[]).includes(canonicalName(k))) ?? null;
-  const similarNames = set.filter((k) => /GEMINI|GOOGLE|GENAI/i.test(k) && k !== geminiKeyName);
+  const pythKeyName = set.find((k) => (PYTH_KEY_NAMES as readonly string[]).includes(canonicalName(k))) ?? null;
+  const similarNames = set.filter((k) => /GEMINI|GOOGLE|GENAI|PYTH|HERMES/i.test(k) && k !== geminiKeyName && k !== pythKeyName && canonicalName(k) !== "PYTH_HERMES_URL");
   const vercel = raw.VERCEL_ENV?.trim();
-  return { deployment: vercel || (raw.NODE_ENV === "production" ? "production (yerel)" : null), commit: raw.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null, geminiKeyName, similarNames };
+  return { deployment: vercel || (raw.NODE_ENV === "production" ? "production (yerel)" : null), commit: raw.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null, geminiKeyName, pythKeyName, similarNames };
 }
 
 /**
